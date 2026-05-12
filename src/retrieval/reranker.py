@@ -24,6 +24,8 @@ Run:
 """
 
 import json
+from torch.utils.data import DataLoader
+
 import argparse
 import random
 from pathlib import Path
@@ -130,9 +132,26 @@ def train_reranker(
     train_data, val_data = build_reranker_dataset(max_samples=max_samples)
 
     # Convert to CrossEncoder format: list of (texts, label) tuples
-    train_samples = [([d["query"], d["passage"]], d["label"]) for d in train_data]
-    val_samples   = [([d["query"], d["passage"]], d["label"]) for d in val_data]
+    # train_samples = [([d["query"], d["passage"]], d["label"]) for d in train_data]
+    # val_samples   = [([d["query"], d["passage"]], d["label"]) for d in val_data]
 
+    from sentence_transformers import InputExample
+
+    train_samples = [
+        InputExample(
+            texts=[d["query"], d["passage"]],
+            label=float(d["label"])
+        )
+        for d in train_data
+    ]
+
+    val_samples = [
+        InputExample(
+            texts=[d["query"], d["passage"]],
+            label=float(d["label"])
+        )
+        for d in val_data
+    ]
     # ── Load model ────────────────────────────────────────────────
     print(f"  Loading base model: {base_model}")
     model = CrossEncoder(
@@ -151,8 +170,13 @@ def train_reranker(
     # ── Train ──────────────────────────────────────────────────────
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    model.fit(
-        train_dataloader = _make_dataloader(train_samples, batch_size),
+    model.fit( 
+
+        train_dataloader = DataLoader(
+            train_samples,
+            shuffle=True,
+            batch_size=batch_size
+        ),
         epochs           = num_epochs,
         warmup_steps     = int(len(train_samples) / batch_size * 0.1),
         output_path      = output_dir,
@@ -163,8 +187,8 @@ def train_reranker(
 
     # ── Evaluate after training ────────────────────────────────────
     print("\n  Fine-tuned model evaluation (after training)...")
-    ft_model = CrossEncoder(output_dir, max_length=max_length)
-    ft_scores = _evaluate_cross_encoder(ft_model, val_data[:200])
+    # ft_model = CrossEncoder(output_dir, max_length=max_length)
+    ft_scores = _evaluate_cross_encoder(model, val_data[:200])
     print(f"    Accuracy  : {ft_scores['accuracy']:.4f}")
     print(f"    Avg score (pos): {ft_scores['avg_pos_score']:.4f}")
     print(f"    Avg score (neg): {ft_scores['avg_neg_score']:.4f}")
@@ -182,7 +206,7 @@ def train_reranker(
     with open(Path(output_dir) / "reranker_metrics.json", "w") as f:
         json.dump(report, f, indent=2)
 
-    return ft_model, report
+    return model, report
 
 
 def _make_dataloader(samples, batch_size):

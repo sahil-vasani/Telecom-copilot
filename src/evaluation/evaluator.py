@@ -22,6 +22,9 @@ Run:
 """
 
 import json
+from bert_score import score as bertscore
+from rouge_score import rouge_scorer
+import numpy as np
 import argparse
 import re
 from pathlib import Path
@@ -122,6 +125,61 @@ def outage_aware_response_rate(result: Dict) -> Optional[float]:
     ]
     return 1.0 if "CheckNetworkStatus" in tools else 0.0
 
+# Metrics-5 ROUGE-L + BERTScore
+def evaluate_generation_metrics(predictions, references):
+    
+    # ROUGE-L
+    rouge = rouge_scorer.RougeScorer(['rougeL'], use_stemmer=True)
+
+    rouge_scores = []
+
+    for pred, ref in zip(predictions, references):
+        score = rouge.score(ref, pred)
+        rouge_scores.append(score['rougeL'].fmeasure)
+
+    rouge_l = np.mean(rouge_scores)
+
+    # BERTScore
+    P, R, F1 = bertscore(
+        predictions,
+        references,
+        lang="en",
+        verbose=False
+    )
+
+    bert_f1 = float(F1.mean())
+
+    return {
+        "rouge_l": round(rouge_l, 4),
+        "bertscore_f1": round(bert_f1, 4),
+    }
+
+def hallucination_rate(results):
+    
+    grounded = []
+
+    for r in results:
+
+        citations = r.get("citations", [])
+
+        grounded.append(1 if citations else 0)
+
+    groundedness = np.mean(grounded)
+
+    return round(1 - groundedness, 4)
+    
+# metrics-9 LATENCY METRICS
+def latency_metrics(results):
+    
+    latencies = [
+        r.get("latency_ms", 0)
+        for r in results
+    ]
+
+    return {
+        "avg_latency_ms": round(np.mean(latencies), 2),
+        "p95_latency_ms": round(np.percentile(latencies, 95), 2),
+    }
 
 # ─── Aggregate ────────────────────────────────────────────────────────────────
 
@@ -136,6 +194,8 @@ def evaluate(results: List[Dict], label: str = "system") -> Dict:
     gea_scores   = []
     oarr_scores  = []
     latencies    = []
+    predictions = []
+    references  = []
 
     for r in results:
         cr_scores.append(citation_recall_at_1(r))
@@ -143,10 +203,15 @@ def evaluate(results: List[Dict], label: str = "system") -> Dict:
         gea_scores.append(grounded_escalation_accuracy(r))
         oarr_scores.append(outage_aware_response_rate(r))
         latencies.append(r.get("latency_ms", 0))
+        predictions.append(r.get("answer", ""))
+        references.append(r.get("gold_answer", ""))
 
-    lat_sorted = sorted(l for l in latencies if l)
-    p95 = lat_sorted[int(len(lat_sorted) * 0.95)] if lat_sorted else None
-
+    halluc_rate = hallucination_rate(results)
+    gen_metrics = evaluate_generation_metrics(
+    predictions,
+    references
+    )
+    lat_metrics = latency_metrics(results)
     return {
         "label":                         label,
         "n":                             len(results),
@@ -154,11 +219,14 @@ def evaluate(results: List[Dict], label: str = "system") -> Dict:
         "answer_coverage_score":         avg(cov_scores),
         "grounded_escalation_accuracy":  avg(gea_scores),
         "outage_aware_response_rate":    avg(oarr_scores),
-        "avg_latency_ms":                avg(latencies),
-        "p95_latency_ms":                round(p95, 1) if p95 else None,
+        "avg_latency_ms": lat_metrics["avg_latency_ms"],
+        "p95_latency_ms": lat_metrics["p95_latency_ms"],
         # Per-domain breakdown
         "by_domain": _by_domain(results),
         "by_source": _by_source(results),
+        "rouge_l":gen_metrics["rouge_l"],
+        "bertscore_f1":gen_metrics["bertscore_f1"],
+        "hallucination_rate": halluc_rate,
     }
 
 
@@ -194,12 +262,15 @@ def print_report(metrics: Dict):
     print(f"  n = {metrics['n']} test cases")
     print(f"{'='*65}")
     rows = [
-        ("Citation Recall@1",                  "grounding ★", metrics["citation_recall_at_1"]),
+        ("Citation Recall@1","grounding ★", metrics["citation_recall_at_1"]),
+        ("ROUGE-L","",metrics["rouge_l"]),
+        ("BERTScore F1","",metrics["bertscore_f1"]),
         ("Answer Coverage Score (ROUGE-1 R)",   "",            metrics["answer_coverage_score"]),
         ("Grounded Escalation Accuracy (GEA)",  "novel",       metrics["grounded_escalation_accuracy"]),
         ("Outage-Aware Response Rate (OARR)",   "novel",       metrics["outage_aware_response_rate"]),
         ("Avg Latency (ms)",                    "",            metrics["avg_latency_ms"]),
         ("P95 Latency (ms)",                    "",            metrics["p95_latency_ms"]),
+        ("Hallucination Rate", "", metrics["hallucination_rate"])
     ]
     for name, tag, val in rows:
         tag_str = f"[{tag}]" if tag else ""
@@ -227,6 +298,8 @@ def compare_reports(baseline: Dict, full: Dict):
         ("Answer Coverage Score",             "answer_coverage_score"),
         ("Grounded Escalation Accuracy",      "grounded_escalation_accuracy"),
         ("Outage-Aware Response Rate",        "outage_aware_response_rate"),
+        ("ROUGE-L",                            "rouge_l"),
+        ("BERTScore F1",                       "bertscore_f1"),
     ]
     for name, key in keys:
         b = baseline.get(key)

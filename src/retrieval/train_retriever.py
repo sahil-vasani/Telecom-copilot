@@ -200,7 +200,7 @@ def evaluate_retriever(
 # ─── Main training function ───────────────────────────────────────────────────
 
 def train_retriever(
-    base_model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+    base_model_name = "BAAI/bge-small-en",
     triples_path:    str = "data/processed/retriever_train.jsonl",
     span_index_path: str = "data/processed/span_index.json",
     output_dir:      str = "checkpoints/retriever",
@@ -237,7 +237,11 @@ def train_retriever(
 
     # ── Load base model ────────────────────────────────────────────
     print(f"  Loading base model: {base_model_name}")
-    model = SentenceTransformer(base_model_name)
+    # model = SentenceTransformer(base_model_name)
+    model = SentenceTransformer(
+    base_model_name,
+    # trust_remote_code=True
+    )
 
     # ── Evaluate BEFORE fine-tuning (baseline retriever numbers) ───
     print("\n  Evaluating BASE model (before fine-tuning)...")

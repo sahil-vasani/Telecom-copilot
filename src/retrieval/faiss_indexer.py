@@ -52,7 +52,10 @@ def embed_passages(
     from sentence_transformers import SentenceTransformer
 
     print(f"  Loading encoder: {model_path}")
-    model = SentenceTransformer(model_path)
+    model = SentenceTransformer(
+    model_path,
+    # trust_remote_code=True
+    )
 
     texts = [p.get(field, p.get("text", "")) for p in passages]
     print(f"  Encoding {len(texts):,} passages (batch_size={batch_size})...")
@@ -194,7 +197,10 @@ class DenseRetriever:
         import faiss
 
         print(f"  [DenseRetriever] Loading encoder: {model_path}")
-        self.model = SentenceTransformer(model_path)
+        self.model = SentenceTransformer(
+        model_path,
+        # trust_remote_code=True
+        )
 
         print(f"  [DenseRetriever] Loading FAISS index (label={label})...")
         self.index, self.store = load_index(index_dir, label)

@@ -13,7 +13,7 @@ Control flow (ReAct-inspired, not copied — our own schema + routing):
   1. Tool Policy: classify query → which tool(s) to call
   2. Tool execution loop: call tools, collect evidence
   3. Escalation check: decide if KB is sufficient
-  4. Generator: produce cited answer from evidence
+  4. Generator: produce cited answer from 
   5. Post-process: parse citations, format response
 
 Difference from baseline:
@@ -30,6 +30,7 @@ os.environ["HF_HOME"] = "D:/huggingface"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 import json
 import time
+from src.generation.hf_mistral_generator import generate_mistral_response
 import re
 import argparse
 from pathlib import Path
@@ -136,7 +137,7 @@ class TelecomCopilot:
         BASE_DIR = Path(__file__).resolve().parents[2],
         retriever_path:  str = str(BASE_DIR / "checkpoints/retriever"),
         reranker_path:   str = str(BASE_DIR / "checkpoints/reranker"),
-        generator_path:  str = str(BASE_DIR / "checkpoints/generator"),
+        generator_path:  str = str(BASE_DIR / "checkpoints/dpo_generator"),
         index_dir:       str = str(BASE_DIR / "data/index"),
         kb_path:         str = str(BASE_DIR / "data/processed/kb_passages.jsonl"),
         span_index_path: str = str(BASE_DIR / "data/processed/span_index.json")):
@@ -159,14 +160,18 @@ class TelecomCopilot:
         )
 
         # Generator (DoRA fine-tuned)
-        self.generator = None
-        try:
-            from src.generation.train_generator import Generator
-            self.generator = Generator(generator_path)
-            print("  [Pipeline] DoRA generator loaded.")
-        except Exception as e:
-            print(f"  [Pipeline] Generator unavailable ({e}). Using API fallback.")
+        # self.generator = None
+        # try:
+        #     self.generator = None
+        #     print("  [Pipeline] Using HuggingFace Mistral API generator.")
+        #     print("  [Pipeline] DoRA generator loaded.")
+        # except Exception as e:
+        #     print(f"  [Pipeline] Generator unavailable ({e}). Using API fallback.")
 
+        # Use HuggingFace Mistral API only
+        self.generator = None
+
+        print("  [Pipeline] Using HuggingFace Mistral API generator.")
         print("="*55 + "\n")
 
     def _api_generate(self, prompt: str) -> str:
@@ -305,24 +310,54 @@ class TelecomCopilot:
                 "dense_score": 1.0,
             }
             gen_context.insert(0, outage_passage)
-
+            
+        context_text = "\n\n".join([
+            f"[DOC: {p.get('doc_id', 'unknown')} | "
+            f"SECTION: {p.get('section_id', 'unknown')}]\n"
+            f"{p.get('text', '')}"
+            for p in gen_context
+        ])
         # ── Step 5: Generate answer ────────────────────────────────
-        if self.generator:
-            gen_result = self.generator.generate(query, gen_context, history)
-            answer     = gen_result["answer"]
-            citations  = gen_result["citations"]
-            raw_output = gen_result["raw_output"]
-        else:
-            # API fallback: inject context into prompt
-            from src.generation.train_generator import build_input_prompt
-            prompt    = build_input_prompt(query, gen_context, history)
-            raw_output = self._api_generate(prompt)
-            # Parse citations from API output
-            citations = []
-            for m in re.finditer(r"\[SOURCE:\s*([^,\]]+),\s*([^\]]+)\]", raw_output):
-                citations.append({"doc_id": m.group(1).strip(),
-                                   "section_id": m.group(2).strip()})
-            answer = re.sub(r"\[SOURCE:[^\]]+\]", "", raw_output).strip()
+        prompt = f"""
+            You are a telecom customer-support AI assistant.
+
+            STRICT RULES:
+            1. Answer ONLY using the provided context.
+            2. NEVER use outside knowledge.
+            3. If answer is not in context, say:
+            "I could not find this information in the telecom knowledge base."
+            4. ALWAYS cite sources in this format:
+            [SOURCE: doc_id, section_id]
+            5. Keep answer concise and factual.
+            6. Do NOT invent policies, taxes, fees, or rules.
+
+            CONTEXT:
+            {context_text}
+
+            QUESTION:
+            {query}
+
+            ANSWER:
+            """
+
+        raw_output = generate_mistral_response(prompt)
+
+        citations = []
+
+        for m in re.finditer(
+            r"\[SOURCE:\s*([^,\]]+),\s*([^\]]+)\]",
+            raw_output
+        ):
+            citations.append({
+                "doc_id": m.group(1).strip(),
+                "section_id": m.group(2).strip()
+            })
+
+        answer = re.sub(
+            r"\[SOURCE:[^\]]+\]",
+            "",
+            raw_output
+        ).strip()
 
         # ── Step 6: Augment answer with ticket / outage info ───────
         if escalated and ticket_id:
