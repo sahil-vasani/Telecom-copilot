@@ -30,7 +30,4 @@ data/processed/
 Thumbs.db
 
 .env
-.env
-__pycache__/
-*.pyc
 hf_cache/
