@@ -24,6 +24,7 @@ Run:
     python -m src.pipeline.inference_pipeline --demo
     python -m src.pipeline.inference_pipeline --eval
 """
+from src.policy.tool_policy_classifier import TrainedToolPolicy
 import os
 
 os.environ["HF_HOME"] = "D:/huggingface"
@@ -160,6 +161,7 @@ class TelecomCopilot:
         )
 
         # Generator (DoRA fine-tuned)
+<<<<<<< HEAD
         # self.generator = None
         # try:
         #     self.generator = None
@@ -167,6 +169,20 @@ class TelecomCopilot:
         #     print("  [Pipeline] DoRA generator loaded.")
         # except Exception as e:
         #     print(f"  [Pipeline] Generator unavailable ({e}). Using API fallback.")
+=======
+        self.generator = None
+        try:
+            from src.generation.train_generator import Generator
+            self.generator = Generator(generator_path)
+            print("  [Pipeline] DoRA generator loaded.")
+            # ADD THIS HERE
+            self.tool_policy_model = TrainedToolPolicy(
+              "checkpoints/tool_policy"
+            )
+            print("  [Pipeline] Tool policy classifier loaded.")
+        except Exception as e:
+            print(f"  [Pipeline] Generator unavailable ({e}). Using API fallback.")
+>>>>>>> 753c661254ddc0ed52852c3d5a114443e5ff051a
 
         # Use HuggingFace Mistral API only
         self.generator = None
@@ -225,8 +241,18 @@ class TelecomCopilot:
         escalated     = False
 
         # ── Step 1: Tool policy — decide what to call ──────────────
-        planned_calls = tool_policy(query, history)
-
+        # planned_calls = self.tool_policy_model.get_tool_calls(
+        #     query,
+        #     history
+        # )
+        try:
+            planned_calls = self.tool_policy_model.get_tool_calls(
+                query,
+                history
+            )
+        except Exception:
+            print(f"[ToolPolicy] Fallback to rule-based router: {e}")
+            planned_calls = tool_policy(query, history)
         # ── Step 2: Execute tool loop ──────────────────────────────
         for tool_name, params in planned_calls:
 
