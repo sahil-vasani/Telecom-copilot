@@ -9,7 +9,7 @@ load_dotenv()
 # Read API key from environment
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-API_URL = "https://openrouter.ai/api/v1/chat/completions"
+API_URL = os.getenv("OPENROUTER_API")
 headers = {
     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
     "Content-Type": "application/json"
