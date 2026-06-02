@@ -1,0 +1,12 @@
+{
+  "label": "finetuned",
+  "n_passages": 25107,
+  "embedding_dim": 1024,
+  "index_type": "IndexIDMap(IndexFlatIP)",
+  "sources": {
+    "telecom_overlay": 28,
+    "charter_pdf_v1": 75,
+    "corpus_builder_v1": 71,
+    "multidoc2dial": 24933
+  }
+}
