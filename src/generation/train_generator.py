@@ -49,6 +49,7 @@ import os
 
 os.environ["HF_HOME"] = "D:/huggingface"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 import json
 import argparse
 import random
@@ -59,8 +60,8 @@ random.seed(42)
 
 # ─── Prompt / target builders ────────────────────────────────────────────────
 
-MAX_INPUT_LEN  = 512   # Flan-T5-base encoder limit
-MAX_TARGET_LEN = 128   # answer + citation tag
+MAX_INPUT_LEN  = 256   # Flan-T5-base encoder limit
+MAX_TARGET_LEN = 64   # answer + citation tag
 
 def build_input_prompt(
     query:    str,
@@ -231,13 +232,13 @@ def get_dora_config(rank: int = 16, alpha: int = 32):
 
 # ─── Main training function ──────────────────────────────────────────────────
 
-def train_generator(
-    base_model_name: str   = "google/flan-t5-base",
+def train_generator( 
+    base_model_name: str = "google/flan-t5-small",
     sft_path:        str   = "data/processed/generator_sft_train.jsonl",
     output_dir:      str   = "checkpoints/generator",
     max_samples:     int   = 8000,
     num_epochs:      int   = 3,
-    batch_size:      int   = 8,
+    batch_size:      int   = 4,
     grad_accum:      int   = 4,      # effective batch = 8 * 4 = 32
     lr:              float = 1e-4,
     dora_rank:       int   = 16,
@@ -261,8 +262,8 @@ def train_generator(
     if quick:
         max_samples = 500
         num_epochs  = 1
-        batch_size  = 4
-        grad_accum  = 2
+        batch_size  = 1
+        grad_accum  = 8
         print("  [QUICK MODE] 500 samples, 1 epoch")
 
     print(f"\n{'='*60}")
@@ -375,8 +376,8 @@ def evaluate_generator(
     ft_model.eval()
 
     # Load base model for comparison
-    if compare_base:
-        base_model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-base")
+    if compare_base: 
+        base_model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-small")
         base_model.eval()
 
     # Load eval samples (val split)
@@ -542,7 +543,8 @@ if __name__ == "__main__":
                         help="Evaluate saved model vs base (no training)")
     parser.add_argument("--demo",        type=str,
                         help="Run inference demo with a query string")
-    parser.add_argument("--base-model",  default="google/flan-t5-base")
+    # parser.add_argument("--base-model",  default="google/flan-t5-base")
+    parser.add_argument("--base-model",  default="google/flan-t5-small")
     parser.add_argument("--output-dir",  default="checkpoints/generator")
     parser.add_argument("--epochs",      type=int,   default=3)
     parser.add_argument("--batch-size",  type=int,   default=8)

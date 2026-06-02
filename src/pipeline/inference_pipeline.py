@@ -138,10 +138,16 @@ class TelecomCopilot:
         BASE_DIR = Path(__file__).resolve().parents[2],
         retriever_path:  str = str(BASE_DIR / "checkpoints/retriever"),
         reranker_path:   str = str(BASE_DIR / "checkpoints/reranker"),
-        generator_path:  str = str(BASE_DIR / "checkpoints/dpo_generator"),
+        generator_path: str = str(BASE_DIR / "checkpoints/generator"),
         index_dir:       str = str(BASE_DIR / "data/index"),
         kb_path:         str = str(BASE_DIR / "data/processed/kb_passages.jsonl"),
         span_index_path: str = str(BASE_DIR / "data/processed/span_index.json")):
+        try:
+            self.tool_policy_model = TrainedToolPolicy()
+            print("  [Pipeline] Tool policy classifier loaded.")
+        except Exception as e:
+            print(f"  [Pipeline] Tool policy unavailable ({e}). Using rule-based policy.")
+            self.tool_policy_model = None
         import sys
         sys.path.insert(0, ".")
 
@@ -161,7 +167,6 @@ class TelecomCopilot:
         )
 
         # Generator (DoRA fine-tuned)
-<<<<<<< HEAD
         # self.generator = None
         # try:
         #     self.generator = None
@@ -169,20 +174,6 @@ class TelecomCopilot:
         #     print("  [Pipeline] DoRA generator loaded.")
         # except Exception as e:
         #     print(f"  [Pipeline] Generator unavailable ({e}). Using API fallback.")
-=======
-        self.generator = None
-        try:
-            from src.generation.train_generator import Generator
-            self.generator = Generator(generator_path)
-            print("  [Pipeline] DoRA generator loaded.")
-            # ADD THIS HERE
-            self.tool_policy_model = TrainedToolPolicy(
-              "checkpoints/tool_policy"
-            )
-            print("  [Pipeline] Tool policy classifier loaded.")
-        except Exception as e:
-            print(f"  [Pipeline] Generator unavailable ({e}). Using API fallback.")
->>>>>>> 753c661254ddc0ed52852c3d5a114443e5ff051a
 
         # Use HuggingFace Mistral API only
         self.generator = None
@@ -250,7 +241,7 @@ class TelecomCopilot:
                 query,
                 history
             )
-        except Exception:
+        except Exception as e:
             print(f"[ToolPolicy] Fallback to rule-based router: {e}")
             planned_calls = tool_policy(query, history)
         # ── Step 2: Execute tool loop ──────────────────────────────

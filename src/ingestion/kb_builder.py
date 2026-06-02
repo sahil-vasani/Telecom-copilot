@@ -328,7 +328,52 @@ def process_telecom_overlay(docs: list) -> List[Dict]:
             passages.append(passage)
     return passages
 
+def load_generated_telecom_kb(
+    telecom_path: str = "data/raw/telecom_kb/passages.jsonl"
+):
+    """
+    Loads generated telecom corpus passages from JSONL.
+    """
+    passages = []
 
+    path = Path(telecom_path)
+
+    if not path.exists():
+        print(f"  Telecom KB file not found: {telecom_path}")
+        return passages
+
+    print("  Loading generated telecom KB...")
+
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            p = json.loads(line)
+            # ensure IDs exist
+            if "section_id" not in p:
+                base_id = p.get("passage_id", hashlib.md5(
+                    p.get("text", "").encode()
+                ).hexdigest()[:12])
+
+                p["section_id"] = f"telecom_generated_{base_id}"
+
+            if "doc_id" not in p:
+                p["doc_id"] = "telecom_generated"
+
+            if "title" not in p:
+                p["title"] = p.get("category", "Telecom KB")
+
+            if "heading" not in p:
+                p["heading"] = p.get("category", "Telecom KB")
+            # ensure required fields exist
+            p.setdefault("source", "telecom_generated")
+            p.setdefault("domain", "telecom")
+            p.setdefault("tags", [])
+            p.setdefault("word_count", len(p.get("text", "").split()))
+
+            passages.append(p)
+
+    print(f"  Loaded {len(passages):,} generated telecom passages")
+
+    return passages
 # ─── Statistics printer ────────────────────────────────────────────────────────
 
 def print_kb_stats(passages: List[Dict]):
@@ -374,9 +419,19 @@ def build_kb(
 
     # ── Layer 2: Telecom overlay ───────────────────────────────────
     print("  Processing telecom overlay documents...")
-    telecom_passages = process_telecom_overlay(TELECOM_OVERLAY_DOCS)
-    print(f"  Telecom overlay: {len(telecom_passages)} passages from "
-          f"{len(TELECOM_OVERLAY_DOCS)} documents")
+    # telecom_passages = process_telecom_overlay(TELECOM_OVERLAY_DOCS)
+    telecom_overlay_passages = process_telecom_overlay(TELECOM_OVERLAY_DOCS)
+
+    generated_telecom_passages = load_generated_telecom_kb()
+
+    telecom_passages = (
+        telecom_overlay_passages
+        + generated_telecom_passages
+    )
+    print(
+        f"  Telecom passages: {len(telecom_passages)} "
+        f"(overlay + generated corpus)"
+    )
 
     # Add telecom overlay docs to doc_index
     for doc in TELECOM_OVERLAY_DOCS:

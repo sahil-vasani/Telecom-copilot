@@ -170,7 +170,7 @@ def train_reranker(
     # ── Train ──────────────────────────────────────────────────────
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    model.fit( 
+    model.fit(
 
         train_dataloader = DataLoader(
             train_samples,
@@ -183,6 +183,9 @@ def train_reranker(
         show_progress_bar= True,
         optimizer_params = {"lr": lr},
     )
+
+    model.save(output_dir)
+
     print(f"\n  Reranker saved → {output_dir}")
 
     # ── Evaluate after training ────────────────────────────────────

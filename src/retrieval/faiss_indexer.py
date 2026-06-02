@@ -103,7 +103,7 @@ def build_faiss_index(embeddings: np.ndarray) -> "faiss.Index":
 def save_index(
     index,
     passages:     List[Dict],
-    output_dir:   str = "data/index",
+    output_dir:   str = "../../data/index",
     label:        str = "finetuned",
 ):
     """
@@ -127,15 +127,31 @@ def save_index(
     store = {}
     for i, p in enumerate(passages):
         store[str(i)] = {
-            "passage_id": p["passage_id"],
-            "doc_id":     p["doc_id"],
-            "section_id": p["section_id"],
-            "title":      p["title"],
-            "heading":    p.get("heading", ""),
-            "text":       p["text"],
-            "category":   p.get("category", ""),
-            "domain":     p.get("domain", ""),
-            "source":     p.get("source", ""),
+            "passage_id": p.get(
+                "passage_id",
+                p.get("section_id", f"passage_{i}")
+            ),
+
+            "doc_id": p.get(
+                "doc_id",
+                "telecom_generated"
+            ),
+
+            "section_id": p.get(
+                "section_id",
+                p.get("passage_id", f"section_{i}")
+            ),
+
+            "title": p.get(
+                "title",
+                p.get("category", "Telecom KB")
+            ),
+
+            "heading": p.get("heading", ""),
+            "text": p.get("text", ""),
+            "category": p.get("category", ""),
+            "domain": p.get("domain", "telecom"),
+            "source": p.get("source", ""),
         }
     store_path = out / f"{label}_passage_store.json"
     with open(store_path, "w") as f:
@@ -159,7 +175,7 @@ def save_index(
     print(f"  Saved index meta → {meta_path}")
 
 
-def load_index(index_dir: str = "data/index", label: str = "finetuned"):
+def load_index(index_dir: str = "../../data/index", label: str = "finetuned"):
     """Loads a previously built FAISS index + passage store."""
     import faiss
 
@@ -189,8 +205,8 @@ class DenseRetriever:
 
     def __init__(
         self,
-        model_path:  str = "checkpoints/retriever",
-        index_dir:   str = "data/index",
+        model_path:  str = "../checkpoints/retriever",
+        index_dir:   str = "../../data/index",
         label:       str = "finetuned",
     ):
         from sentence_transformers import SentenceTransformer
@@ -224,12 +240,13 @@ class DenseRetriever:
             List of passage dicts with an added "dense_score" field
         """
         import numpy as np
+        query = f"Represent this sentence for searching relevant passages: {query}"
 
         # Encode query (single, no batching needed)
         q_emb = self.model.encode(
             [query],
-            normalize_embeddings = True,
-            convert_to_numpy     = True,
+            normalize_embeddings=True,
+            convert_to_numpy=True
         ).astype(np.float32)
 
         # Over-retrieve if filtering, to still get top_k after filter
@@ -285,9 +302,9 @@ class DenseRetriever:
 # ─── Full pipeline: embed + index ─────────────────────────────────────────────
 
 def build_index_pipeline(
-    kb_path:     str = "data/processed/kb_passages.jsonl",
-    model_path:  str = "checkpoints/retriever",
-    output_dir:  str = "data/index",
+    kb_path:     str = "../../data/processed/kb_passages.jsonl",
+    model_path:  str = "../checkpoints/retriever",
+    output_dir:  str = "../../data/index",
     label:       str = "finetuned",
     batch_size:  int = 128,
 ):
@@ -325,9 +342,9 @@ def build_index_pipeline(
 # ─── Retrieval benchmark (BM25 vs Dense) ──────────────────────────────────────
 
 def benchmark_retrieval(
-    test_cases_path: str = "data/processed/test_cases.jsonl",
-    index_dir:       str = "data/index",
-    kb_path:         str = "data/processed/kb_passages.jsonl",
+    test_cases_path: str = "../../data/processed/test_cases.jsonl",
+    index_dir:       str = "../../data/index",
+    kb_path:         str = "../../data/processed/kb_passages.jsonl",
     retriever_path:  str = "checkpoints/retriever",
     top_k:           int = 5,
 ) -> Dict:
@@ -417,7 +434,7 @@ def benchmark_retrieval(
         "bm25":  {"recall_at_1": avg(bm25_r1), "recall_at_5": avg(bm25_r5), "mrr_at_10": avg(bm25_mrr)},
         "dense": {"recall_at_1": avg(dense_r1), "recall_at_5": avg(dense_r5), "mrr_at_10": avg(dense_mrr)} if has_dense else {},
     }
-    out_path = Path("data/processed/retrieval_benchmark.json")
+    out_path = Path("../../data/processed/retrieval_benchmark.json")
     with open(out_path, "w") as f:
         json.dump(report, f, indent=2)
     print(f"  Benchmark saved → {out_path}")
@@ -444,7 +461,7 @@ if __name__ == "__main__":
     if args.base_only:
         build_index_pipeline(
             kb_path    = args.kb,
-            model_path = "sentence-transformers/all-MiniLM-L6-v2",
+            model_path = "BAAI/bge-large-en-v1.5",
             output_dir = args.output_dir,
             label      = "base",
             batch_size = args.batch_size,

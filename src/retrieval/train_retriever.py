@@ -4,17 +4,17 @@ src/retrieval/train_retriever.py
 Week 2 — Fine-tune a Dense Retriever on MultiDoc2Dial triples.
 
 Architecture:
-  Base model  : sentence-transformers/all-MiniLM-L6-v2  (22M params, fast)
+  Base model  : base_model_name = "BAAI/bge-large-en-v1.5"  (335M params, fast)
   Loss        : MultipleNegativesRankingLoss (MNRL)
                - treats every other positive in the batch as a negative
                - ideal for (query, positive) pairs
   Hard negs   : In-batch + explicitly mined hard negatives from retriever_train.jsonl
   Evaluation  : Recall@1, Recall@5, MRR@10 on MD2D validation triples
 
-Why all-MiniLM-L6-v2?
+Why base_model_name = "BAAI/bge-large-en-v1.5"?
   - Fast enough to embed the full KB (~3000+ passages) in seconds
   - Strong zero-shot baseline to fine-tune from
-  - 384-dim embeddings → FAISS IndexFlatIP works well at this scale
+  - 1024-dim embeddings → FAISS IndexFlatIP works well at this scale
   - Recommended in sentence-transformers docs for asymmetric retrieval
 
 Training time estimates (Google Colab T4 GPU):
@@ -37,7 +37,7 @@ import random
 import os
 from pathlib import Path
 from typing import List, Dict, Tuple
-
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 random.seed(42)
 
 
@@ -46,7 +46,7 @@ random.seed(42)
 def load_retriever_triples(
     path: str = "data/processed/retriever_train.jsonl",
     span_index_path: str = "data/processed/span_index.json",
-    max_samples: int = 10000,
+    max_samples: int = 5000,
     val_ratio: float = 0.1,
 ) -> Tuple[List, List]:
     """
@@ -200,26 +200,25 @@ def evaluate_retriever(
 # ─── Main training function ───────────────────────────────────────────────────
 
 def train_retriever(
-    base_model_name = "BAAI/bge-small-en",
-    triples_path:    str = "data/processed/retriever_train.jsonl",
+    base_model_name = "BAAI/bge-large-en-v1.5",
+    triples_path: str = "data/processed/retriever_train.jsonl",
     span_index_path: str = "data/processed/span_index.json",
     output_dir:      str = "checkpoints/retriever",
-    max_samples:     int = 10000,
-    num_epochs:      int = 3,
-    batch_size:      int = 32,
+    max_samples:     int = 5000,
+    num_epochs:      int = 2,
+    batch_size:      int = 4,
     warmup_ratio:    float = 0.1,
     lr:              float = 2e-5,
     quick:           bool = False,
 ):
-    from sentence_transformers import SentenceTransformer, losses
-    from sentence_transformers.evaluation import InformationRetrievalEvaluator
+    from sentence_transformers import SentenceTransformer, losses 
     from torch.utils.data import DataLoader
 
     if quick:
-        max_samples = 2000
+        max_samples = 500
         num_epochs  = 1
-        batch_size  = 16
-        print("  [QUICK MODE] 2000 samples, 1 epoch")
+        batch_size  = 4
+        print("  [QUICK MODE] 500 samples, 1 epoch")
 
     print(f"\n{'='*60}")
     print(f"  RETRIEVER FINE-TUNING")
@@ -277,16 +276,36 @@ def train_retriever(
         epochs             = num_epochs,
         warmup_steps       = warmup_steps,
         optimizer_params   = {"lr": lr},
-        output_path        = output_dir,
-        save_best_model    = True,
+        output_path        = None,
+        save_best_model    = False,
         show_progress_bar  = True,
     )
-    print(f"\n  Model saved → {output_dir}")
+    # print(f"\n  Model saved → {output_dir}")
+    import gc
+    import torch
+
+    gc.collect()
+
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    try:
+        model.save(
+            output_dir,
+            safe_serialization=False
+        )
+        print(f"\nModel saved → {output_dir}")
+    except Exception as e:
+        print(f"\nSave failed: {e}")
 
     # ── Evaluate AFTER fine-tuning ─────────────────────────────────
     print("\n  Evaluating FINE-TUNED model (after training)...")
-    finetuned_model = SentenceTransformer(output_dir)
-    ft_metrics      = evaluate_retriever(finetuned_model, val_triples, span_index)
+
+    ft_metrics = evaluate_retriever(
+        model,
+        val_triples,
+        span_index
+    )
     print("  Fine-tuned model metrics:")
     for k, v in ft_metrics.items():
         print(f"    {k:<20} {v:.4f}")
@@ -317,7 +336,7 @@ def train_retriever(
     with open(report_path, "w") as f:
         json.dump(report, f, indent=2)
     print(f"\n  Metrics saved → {report_path}")
-    return finetuned_model, report
+    return model, report
 
 
 # ─── CLI ──────────────────────────────────────────────────────────────────────
@@ -328,10 +347,13 @@ if __name__ == "__main__":
                         help="Quick smoke test (2000 samples, 1 epoch)")
     parser.add_argument("--eval",       action="store_true",
                         help="Evaluate saved model only (no training)")
-    parser.add_argument("--base-model", default="sentence-transformers/all-MiniLM-L6-v2")
-    parser.add_argument("--epochs",     type=int,   default=3)
-    parser.add_argument("--batch-size", type=int,   default=32)
-    parser.add_argument("--max-samples",type=int,   default=10000)
+    parser.add_argument(
+        "--base-model",
+        default="BAAI/bge-large-en-v1.5"
+    )
+    parser.add_argument("--epochs",     type=int,   default=2)
+    parser.add_argument("--batch-size", type=int,   default=16)
+    parser.add_argument("--max-samples",type=int,   default=5000)
     parser.add_argument("--lr",         type=float, default=2e-5)
     parser.add_argument("--output-dir", default="checkpoints/retriever")
     args = parser.parse_args()
