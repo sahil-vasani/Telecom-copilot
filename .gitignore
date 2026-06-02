@@ -3,8 +3,13 @@ __pycache__/
 *.pyc
 
 # Data
-data/raw/
-data/intermediate/
+data/raw/ 
+
+# Models
+checkpoints/
+
+# FAISS indexes
+data/index/*.index
 
 # Models
 checkpoints/
@@ -18,3 +23,6 @@ checkpoints/
 # HuggingFace
 cache/
 huggingface/
+
+.env
+.env.*
