@@ -2,32 +2,19 @@
 __pycache__/
 *.pyc
 
-# HuggingFace
-.huggingface/
-cache/
+# Data
+data/raw/
+data/intermediate/
 
 # Models
 checkpoints/
-*.safetensors
+*.pt
 *.bin
-
-# Data
-data/raw/
-data/index/
-data/processed/
-
-# Streamlit cache
-.streamlit/
-
-# VS Code
-.vscode/
+*.safetensors
 
 # Jupyter
 .ipynb_checkpoints/
 
-# OS
-.DS_Store
-Thumbs.db
-
-.env
-hf_cache/
+# HuggingFace
+cache/
+huggingface/
