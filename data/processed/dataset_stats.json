@@ -1,9 +1,9 @@
 {
-  "total_passages": 25107,
+  "total_passages": 26179,
   "md2d_passages": 24933,
-  "telecom_overlay_passages": 174,
+  "telecom_overlay_passages": 1246,
   "total_documents": 498,
   "md2d_documents": 488,
   "telecom_overlay_docs": 10,
-  "total_words": 377647
+  "total_words": 414618
 }

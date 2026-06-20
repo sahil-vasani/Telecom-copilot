@@ -25,12 +25,22 @@ Usage:
 import json
 import argparse
 from pathlib import Path
-from  data_source.bsnl_data_ingestion import BSNL_CHARTER_PASSAGES
-from  data_source.jio_data_ingestion import JIO_FAQ_DATA
-from  data_source.airtel_data_ingestion import AIRTEL_FAQ_DATA
-from data_source.vi_data_ingestion import VI_FAQ_DATA
-from data_source.TRAI_data_ingestion import TRAI_PASSGES
-from data_source.general_ingestion import NEW_GENERAL_PASSAGES
+
+try:
+    from data_source.bsnl_data_ingestion import BSNL_CHARTER_PASSAGES
+    from data_source.jio_data_ingestion import JIO_FAQ_DATA
+    from data_source.airtel_data_ingestion import AIRTEL_FAQ_DATA
+    from data_source.vi_data_ingestion import VI_FAQ_DATA
+    from data_source.TRAI_data_ingestion import TRAI_PASSGES
+    from data_source.general_ingestion import NEW_GENERAL_PASSAGES
+except ModuleNotFoundError:
+    from src.ingestion.data_source.bsnl_data_ingestion import BSNL_CHARTER_PASSAGES
+    from src.ingestion.data_source.jio_data_ingestion import JIO_FAQ_DATA
+    from src.ingestion.data_source.airtel_data_ingestion import AIRTEL_FAQ_DATA
+    from src.ingestion.data_source.vi_data_ingestion import VI_FAQ_DATA
+    from src.ingestion.data_source.TRAI_data_ingestion import TRAI_PASSGES
+    from src.ingestion.data_source.general_ingestion import NEW_GENERAL_PASSAGES
+
 # ────────────────
 #  CATEGORY 1 : 5G / 4G Connectivity  (80 passages)
 # ─────────────────────────────────────────────────────────────
