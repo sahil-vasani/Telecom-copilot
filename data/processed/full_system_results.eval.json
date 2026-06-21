@@ -1,0 +1,33 @@
+{
+  "label": "full_system",
+  "n": 205,
+  "citation_recall_at_1": 0.0,
+  "answer_coverage_score": 0.0008,
+  "grounded_escalation_accuracy": 0.922,
+  "outage_aware_response_rate": 1.0,
+  "avg_latency_ms": 915.4,
+  "p95_latency_ms": 1502.66,
+  "by_domain": {
+    "dmv": {
+      "n": 200,
+      "citation_recall": 0.0,
+      "answer_coverage": 0.0005
+    },
+    "telecom": {
+      "n": 5,
+      "citation_recall": 0.0,
+      "answer_coverage": 0.0154
+    }
+  },
+  "by_source": {
+    "multidoc2dial_validation": {
+      "n": 200
+    },
+    "telecom_handcrafted": {
+      "n": 5
+    }
+  },
+  "rouge_l": 0.0477,
+  "bertscore_f1": 0.8013,
+  "hallucination_rate": 1.0
+}

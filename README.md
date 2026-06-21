@@ -402,26 +402,42 @@ This enables the system to detect outages and proactively inform customers about
 
 ---
 
-## ⚙️ Installation
+## ⚙️ Installation & Running instructions
 
 ### Prerequisites
 
-- Python 3.11+
-- CUDA-capable GPU (16GB+ VRAM recommended; T4 sufficient)
-- [OpenRouter API key](https://openrouter.ai) for Mistral fallback
+* Python 3.10+
+* Node.js v18+ & npm v9+ (for the operations dashboard)
+* CUDA GPU (Optional, CPU execution supported for the pipeline)
+* [OpenRouter API key](https://openrouter.ai) (for generator API calls)
 
-### Setup
+---
 
-```bash
-git clone https://github.com/your-username/telecom-rag.git
-cd telecom-rag
+### Step 1: Base Setup & Backend Installation
 
+First, clone the repository, set up a virtual environment, and install dependencies:
+
+```powershell
+# 1. Clone & Enter project
+git clone https://github.com/sahil-vasani/Telecom-copilot.git
+cd Telecom-copilot
+
+# 2. Create and activate a Virtual Environment
+python -m venv .venv
+# On Windows (PowerShell):
+.venv\Scripts\activate
+# On Linux / macOS:
+source .venv/bin/activate
+
+# 3. Install requirements
 pip install -r requirements.txt
 ```
 
-### Environment Variables
+---
 
-Create a `.env` file in the project root:
+### Step 2: Configure Environment Variables
+
+Create a `.env` file in the project root containing your API configurations:
 
 ```env
 OPENROUTER_API_KEY=your_openrouter_api_key_here
@@ -429,14 +445,58 @@ OPENROUTER_API=https://openrouter.ai/api/v1/chat/completions
 HF_HOME=./huggingface_cache
 ```
 
-> ⚠️ Never commit your `.env` file. It is listed in `.gitignore`.
+---
+
+### Step 3: Run the Training Pipeline
+
+If you want to train RAG components from scratch, run each phase sequentially:
+
+```bash
+# 1. Build local Knowledge Base files
+python -m src.ingestion.kb_builder
+
+# 2. Build training dataset triples
+python -m src.ingestion.training_data_builder
+
+# 3. Build the Telecom Overlay corpus
+python -m src.ingestion.telecom_corpus_builder
+
+# 4. Fine-tune BGE Dense Retriever
+python -m src.retrieval.train_retriever
+
+# 5. Index the passages using FAISS
+python -m src.retrieval.faiss_indexer --model checkpoints/retriever
+
+# 6. Fine-tune Cross-Encoder Reranker
+# (Windows user console encoding warning: prepend $env:PYTHONUTF8="1" in PowerShell)
+python -m src.retrieval.reranker --train --max-samples 1000 --epochs 1
+```
 
 ---
 
-## 🚀 Usage
+### Step 4: Launch the React Operations Dashboard
+
+The project features a premium SaaS dashboard to query the copilot agent and inspect RAG states:
+
+```bash
+# 1. Enter the frontend directory
+cd frontend
+
+# 2. Install node packages
+npm install
+
+# 3. Start the development server
+npm run dev
+```
+Open `http://localhost:5173/` in your browser to view the interactive application.
+
+---
+
+## 🚀 Usage (Python Backend CLI)
 
 ### Quick Demo
 
+To run the pipeline directly in the terminal:
 ```bash
 python -m src.pipeline.inference_pipeline --demo
 ```

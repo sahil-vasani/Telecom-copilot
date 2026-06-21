@@ -1313,7 +1313,7 @@ VI_FAQ_DATA = [
 
 {
     "title": "Vi Long Validity Annual Recharge Concept",
-"text": (~
+    "text": (
         "Annual recharge plans are designed for subscribers seeking uninterrupted "
         "service validity for extended periods while reducing the need for "
         "frequent recharges."
