@@ -154,7 +154,7 @@ User Query
 │   │
 │   ├── generation/
 │   │   ├── train_generator.py             # DoRA fine-tuning on Flan-T5-base
-│   │   └── hf_mistral_generator.py        # OpenRouter Mistral inference fallback
+│   │   └── openrouter_generator.py        # OpenRouter external inference fallback
 │   │
 │   ├── tools/
 │   │   └── tool_executor.py               # SearchKB, GetPolicy, CreateTicket, CheckNetworkStatus
@@ -543,12 +543,12 @@ print(response["citations"])
 python -m src.pipeline.inference_pipeline --eval
 ```
 
-### Generate Mistral Response (Fallback)
+### Generate OpenRouter Response (Fallback)
 
 ```python
-from src.generation.hf_mistral_generator import generate_mistral_response
+from src.generation.openrouter_generator import generate_openrouter_response
 
-answer = generate_mistral_response("Explain Airtel's 5G rollout in India.")
+answer = generate_openrouter_response("Explain Airtel's 5G rollout in India.")
 print(answer)
 ```
 
@@ -567,8 +567,8 @@ Key hyperparameters are documented inline in each module's docstring. The most i
 | Generator alpha | 32 | `train_generator.py` |
 | FAISS top-K retrieve | 20 | `faiss_indexer.py` |
 | Reranker top-K output | 3 | `reranker.py` |
-| Mistral max tokens | 1024 | `hf_mistral_generator.py` |
-| Mistral temperature | 0.2 | `hf_mistral_generator.py` |
+| OpenRouter max tokens | 1024 | `openrouter_generator.py` |
+| OpenRouter temperature | 0.2 | `openrouter_generator.py` |
 
 ---
 
@@ -639,7 +639,7 @@ Key hyperparameters are documented inline in each module's docstring. The most i
 - [DoRA — Liu et al., ICML 2024](https://arxiv.org/abs/2402.09353) — PEFT method
 - [sentence-transformers](https://www.sbert.net/) — retrieval training framework
 - [FAISS](https://github.com/facebookresearch/faiss) — vector search
-- [OpenRouter](https://openrouter.ai) — Mistral inference API
+- [OpenRouter](https://openrouter.ai) — External inference API
 
 ---
 

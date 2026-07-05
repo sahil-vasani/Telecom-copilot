@@ -31,7 +31,7 @@ os.environ["HF_HOME"] = "D:/huggingface"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 import json
 import time
-from src.generation.hf_mistral_generator import generate_mistral_response
+from src.generation.openrouter_generator import generate_openrouter_response
 import re
 import argparse
 from pathlib import Path
@@ -170,15 +170,15 @@ class TelecomCopilot:
         # self.generator = None
         # try:
         #     self.generator = None
-        #     print("  [Pipeline] Using HuggingFace Mistral API generator.")
+        #     print("  [Pipeline] Using OpenRouter API generator.")
         #     print("  [Pipeline] DoRA generator loaded.")
         # except Exception as e:
         #     print(f"  [Pipeline] Generator unavailable ({e}). Using API fallback.")
 
-        # Use HuggingFace Mistral API only
+        # Use OpenRouter API only
         self.generator = None
 
-        print("  [Pipeline] Using HuggingFace Mistral API generator.")
+        print("  [Pipeline] Using OpenRouter API generator.")
         print("="*55 + "\n")
 
     def _api_generate(self, prompt: str) -> str:
@@ -357,7 +357,7 @@ class TelecomCopilot:
             ANSWER:
             """
 
-        raw_output = generate_mistral_response(prompt)
+        raw_output = generate_openrouter_response(prompt)
 
         citations = []
 

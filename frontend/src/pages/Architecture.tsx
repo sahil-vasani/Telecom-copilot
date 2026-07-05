@@ -89,7 +89,7 @@ const NODES: ArchNode[] = [
     id: 'generator',
     name: 'Grounded Generator',
     icon: Award,
-    modelType: 'DoRA Fine-Tuned Flan-T5-base / Mistral API',
+    modelType: 'DoRA Fine-Tuned Flan-T5-base / OpenRouter API',
     description: 'Drafts the final response by strictly grounding the answer in the retrieved facts and formatting citations.',
     input: 'Top-3 Reranked contexts + Tool outputs + Query',
     output: 'Structured grounded response + citation nodes',

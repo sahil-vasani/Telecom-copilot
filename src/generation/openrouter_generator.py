@@ -16,7 +16,7 @@ headers = {
 }
 
 
-def generate_mistral_response(prompt):
+def generate_openrouter_response(prompt):
     clean_prompt = prompt
     if "CONTEXT:" in prompt:
         clean_prompt = prompt[prompt.find("CONTEXT:"):]
