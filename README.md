@@ -16,6 +16,7 @@
 ## 🗂 Table of Contents
 
 - [Overview](#-overview)
+- [Live Demo Screenshots](#-live-demo-screenshots)
 - [System Architecture](#-system-architecture)
 - [Project Structure](#-project-structure)
 - [Components](#-components)
@@ -52,6 +53,28 @@ TelecomRAG is a **multi-component NLP system** that answers Indian telecom custo
 | Citations | ❌ | ✅ Structured `[SOURCE: doc_id, section_id]` |
 | Tool Calls | ❌ | ✅ SearchKB, GetPolicy, CreateTicket, CheckNetworkStatus |
 | Escalation | ❌ | ✅ Confidence-based escalation logic |
+
+---
+
+## 📸 Live Demo Screenshots
+
+Below are screenshots of the running live interface from the TelecomRAG Operations Dashboard:
+
+### 📊 Dashboard Page
+The main landing page displays system metrics, service tickets status (Open vs Escalated), active network status anomalies, and database statistics.
+![Dashboard Page](docs/images/dashboard_demo.png)
+
+### 💬 Copilot Chat Screen
+The chat window handles query routing, active tool execution (e.g. dense retrieval + cross-encoder reranking), citations formatting, and ticket creation.
+![Copilot Chat](docs/images/copilot_chat_demo.png)
+
+### 🎫 Support Tickets View
+Track customer complaints and issues that have been confidence-escalated into structured tickets.
+![Support Tickets](docs/images/tickets_demo.png)
+
+### 🚨 Network status
+View active network anomalies and outage durations, enabling automated service credit calculations.
+![Network Status](docs/images/network_status_demo.png)
 
 ---
 
@@ -544,7 +567,7 @@ Key hyperparameters are documented inline in each module's docstring. The most i
 | Generator alpha | 32 | `train_generator.py` |
 | FAISS top-K retrieve | 20 | `faiss_indexer.py` |
 | Reranker top-K output | 3 | `reranker.py` |
-| Mistral max tokens | 256 | `hf_mistral_generator.py` |
+| Mistral max tokens | 1024 | `hf_mistral_generator.py` |
 | Mistral temperature | 0.2 | `hf_mistral_generator.py` |
 
 ---
