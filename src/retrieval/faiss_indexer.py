@@ -120,7 +120,7 @@ def save_index(
     # FAISS index
     idx_path = out / f"{label}_faiss.index"
     faiss.write_index(index, str(idx_path))
-    print(f"  Saved FAISS index → {idx_path}")
+    print(f"  Saved FAISS index -> {idx_path}")
 
     # Passage store: row_id → passage record
     # Store only the fields needed at retrieval time to keep file small
@@ -156,7 +156,7 @@ def save_index(
     store_path = out / f"{label}_passage_store.json"
     with open(store_path, "w") as f:
         json.dump(store, f, ensure_ascii=False)
-    print(f"  Saved passage store ({len(store):,} entries) → {store_path}")
+    print(f"  Saved passage store ({len(store):,} entries) -> {store_path}")
 
     # Meta
     meta = {
@@ -172,7 +172,7 @@ def save_index(
     meta_path = out / f"{label}_index_meta.json"
     with open(meta_path, "w") as f:
         json.dump(meta, f, indent=2)
-    print(f"  Saved index meta → {meta_path}")
+    print(f"  Saved index meta -> {meta_path}")
 
 
 def load_index(index_dir: str = "../../data/index", label: str = "finetuned"):
@@ -437,7 +437,7 @@ def benchmark_retrieval(
     out_path = Path("../../data/processed/retrieval_benchmark.json")
     with open(out_path, "w") as f:
         json.dump(report, f, indent=2)
-    print(f"  Benchmark saved → {out_path}")
+    print(f"  Benchmark saved -> {out_path}")
     return report
 
 

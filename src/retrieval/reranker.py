@@ -186,7 +186,7 @@ def train_reranker(
 
     model.save(output_dir)
 
-    print(f"\n  Reranker saved → {output_dir}")
+    print(f"\n  Reranker saved -> {output_dir}")
 
     # ── Evaluate after training ────────────────────────────────────
     print("\n  Fine-tuned model evaluation (after training)...")

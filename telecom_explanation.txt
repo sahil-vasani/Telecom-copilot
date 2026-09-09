@@ -1,0 +1,5585 @@
+Telecom Copilot Project – Data Collection & Overall Data Flow
+
+
+Step 1: Why did we need our own dataset?
+The goal of this project was to build a Telecom Customer Support AI Assistant using Retrieval-Augmented Generation (RAG).
+
+Large Language Models already know general knowledge, but they do not reliably know company-specific telecom policies, recharge procedures, APN settings, or telecom regulations. Even when they know something, the information may be outdated or hallucinated.
+
+Step 2: Which datasets could have been used?
+Option 1 — Collect everything manually
+One possibility was to manually create thousands of telecom question-answer pairs.
+Disadvantages
+
+Extremely time-consuming
+Requires telecom experts
+Difficult to scale
+Expensive
+
+Option 2 — Scrape telecom websites
+Disadvantages
+
+Different website structures
+Frequent website updates
+Legal and copyright considerations
+Large amount of cleaning required
+
+Option 3 — Use an existing public telecom dataset
+there is no large, high-quality, open-source telecom customer support dataset comparable to datasets like MultiDoc2Dial.
+
+Most public customer-support datasets belong to banking, government services, or general help desks.
+
+Therefore, relying only on public telecom datasets was not possible.
+
+Step 3: Why was MultiDoc2Dial selected?
+Instead of searching only for telecom datasets, I searched for datasets that teach customer support conversations.
+The best publicly available dataset was MultiDoc2Dial.
+It contains:
+
+real customer conversations
+agent responses
+document grounding
+document references
+
+Why didn't I use MultiDoc2Dial alone?
+
+Because its documents belong to domains like:
+
+government
+public services
+insurance
+benefits
+
+It contains almost no telecom-specific information.
+
+If I trained only on MultiDoc2Dial, the chatbot would not know:
+
+APN settings
+recharge plans
+SIM activation
+telecom billing
+network troubleshooting
+roaming
+TRAI regulations
+
+Therefore, an additional telecom knowledge base was required.
+
+Step 4: Building a Telecom Knowledge Base
+To overcome the lack of telecom data, I created my own telecom corpus.
+Instead of depending on one source, I combined information from multiple trusted sources
+The knowledge base includes information derived from:
+
+BSNL Customer Charter
+Jio FAQs
+Airtel FAQs
+Vi FAQs
+TRAI guidelines
+General telecom troubleshooting
+Manually written synthetic passages
+
+The telecom dataset is mostly synthetic, but it is not randomly generated.
+The process was:
+
+Read official telecom documents.
+Read carrier FAQs.
+Understand common telecom problems.
+Rewrite and standardize the information into a common format.
+Write additional missing FAQs manually.
+Store every passage with metadata.
+
+Step 5: Why was SHP-2 used?
+Its purpose is not retrieval.
+
+Its purpose is not knowledge storage.
+
+Instead, SHP-2 teaches the model:
+
+Which answer is better when two responses are available.
+
+MultiDoc2Dial	Teaches grounded customer support conversations and document retrieval
+Telecom Knowledge Base	Provides telecom-specific domain knowledge missing from public datasets
+SHP-2	Teaches the model to prefer better, clearer responses during preference optimization
+
+
+Why did I choose MultiDoc2Dial?
+MultiDoc2Dial is a publicly available research dataset introduced by researchers at Amazon and the University of Washington for building document-grounded conversational AI.
+
+It contains:
+
+Multi-turn customer support conversations
+User queries
+Agent responses
+Ground-truth document passages used to answer the query
+Document span annotations (which paragraph supports the answer)
+
+Where is it available?
+Hugging Face Dataset:
+GitHub
+
+i taken from hugging face
+
+Why did I choose MultiDoc2Dial?
+
+My project is a Retrieval-Augmented Generation (RAG) system.
+
+A RAG system requires data that contains:
+
+✔ User Question
+
+↓
+
+✔ Correct Document
+
+↓
+
+✔ Correct Answer
+
+MultiDoc2Dial already provides exactly this structure.
+
+
+What other datasets were available instead of MultiDoc2Dial?
+Option 1 — Doc2Dial
+
+Official Google Dataset
+
+Purpose
+
+Document-grounded dialogue.
+Cons:
+
+Smaller
+Single-document conversations
+
+
+Option 2 — MS MARCO
+
+Purpose
+
+Passage Retrieval
+
+Pros
+
+Huge dataset
+Cons
+
+Not conversational
+No customer support dialogue
+
+
+Why did I choose SHP-2?
+What is SHP-2?
+
+SHP-2 (Stanford Human Preferences Dataset v2) is a human preference dataset released by Stanford
+
+Instead of storing knowledge,
+
+it stores human judgments between two responses.
+
+Example
+
+Question
+
+How do I recharge?
+
+Answer A
+
+Recharge through MyJio app.
+
+Answer B
+
+There are many ways...
+
+Humans vote which answer is better.
+
+Where is it available?
+
+Official sources
+Hugging Face
+Research Paper
+
+Why did I choose SHP-2?
+
+My project contains DPO (Direct Preference Optimization).
+
+DPO requires
+
+Prompt
+
+↓
+
+Preferred Answer
+
+↓
+
+Rejected Answer
+
+SHP-2 already provides this format.
+
+So I didn't need to manually label thousands of preferred answers.
+
+
+Limitations
+
+It is not telecom specific.
+
+It contains general conversations.
+
+Therefore,
+
+I only used SHP-2 for preference learning, not for telecom knowledge
+What other datasets were available instead of SHP-2?
+Option 1 — HH-RLHF (Anthropic Helpful and Harmless)
+Purpose
+HH-RLHF (Helpful and Harmless - Reinforcement Learning from Human Feedback")
+Cons
+
+License restrictions
+
+Why not?
+
+More difficult to use and less straightforward for this project.
+
+Option 2 — UltraFeedback
+Cons
+
+Mostly LLM-generated rankings rather than purely human annotations
+I preferred a dataset with established human preference labels.
+
+
+
+kb_builder.py — Building the Knowledge Base (KB)
+
+Purpose of this file
+
+After collecting data from different sources, the data is still scattered and stored in different formats.
+
+For example:
+
+MultiDoc2Dial stores documents in its own Hugging Face dataset format.
+My telecom dataset is stored as passages.jsonl.
+Telecom overlay articles are written directly inside Python.
+
+Therefore, the purpose of kb_builder.py is to convert every source into one unified knowledge base with a common schema so that every passage looks identical regardless of where it came from
+
+Without this step:
+
+every dataset would have a different format,
+searching would become inconsistent,
+retrieval quality would decrease.
+
+Although MultiDoc2Dial already contains documents, those documents belong to only four domains
+
+DMV: Department of Motor Vehicles
+SSA: Social Security Administration
+FSA (or FSA-Student Aid): Federal Student Aid
+VA: Veterans Affairs
+
+The file builds the KB in two layers.
+Layer 1 — MultiDoc2Dial Documents
+The first layer loads the original MultiDoc2Dial documents.
+
+These are real customer-support documents that are already linked to the conversation dataset.
+
+Layer 2 — Telecom Knowledge
+
+The second layer adds telecom-specific information.
+
+It includes:
+
+Telecom overlay documents
+Generated telecom corpus (passages.jsonl)
+
+
+Why not train only on telecom data?
+
+There are two reasons.
+
+Reason 1
+
+The telecom corpus is relatively small.
+
+Training an entire RAG model using only this data would likely reduce generalization.
+
+Reason 2
+
+MultiDoc2Dial already provides professionally annotated customer-support conversations with document grounding.
+
+Combining both datasets gives:
+
+realistic customer-support conversations
+telecom domain knowledge
+
+
+kb_builder.py Complete Flow
+Input Data
+        │
+        ▼
+1. Load MultiDoc2Dial Documents
+        │
+        ▼
+2. Convert every document into a common passage format
+        │
+        ▼
+3. Process Telecom Overlay Knowledge
+        │
+        ▼
+4. Load Generated Telecom KB (passages.jsonl)
+        │
+        ▼
+5. Standardize telecom passages into same schema
+        │
+        ▼
+6. Merge MD2D + Telecom passages
+        │
+        ▼
+7. Build metadata indexes
+        │
+        ▼
+8. Compute dataset statistics
+        │
+        ▼
+9. Save Final Knowledge Base Files
+
+
+Step 1 — Load MultiDoc2Dial Documents
+
+Input
+
+MultiDoc2Dial Document Dataset
+
+This contains all official documents used in the MultiDoc2Dial dataset.
+Examples
+SSA , DMV
+Step 2 — Convert MultiDoc2Dial into KB Format
+
+Each document is converted into a standard passage schema.
+
+Every passage receives metadata such as
+
+passage_id
+document_id
+section_id
+title
+heading
+category
+domain
+source
+tags
+text
+word_count
+
+Now every MultiDoc2Dial passage looks like
+
+{
+    passage_id
+    doc_id
+    title
+    text
+    category
+    domain
+    source
+}
+
+Instead of raw dataset objects, everything becomes retrieval-ready.
+Step 3 — Process Telecom Overlay
+
+Now the pipeline loads your telecom knowledge.
+
+This includes telecom articles such as
+
+Billing
+Recharge
+Plans
+APN
+SIM
+Network
+Roaming
+Device
+Account
+Escalation
+
+These telecom documents are also converted into exactly the same schema as MultiDoc2Dial.
+
+So now both datasets have identical structure.
+Step 5 — Standardize Telecom Passages
+
+Even if telecom passages have slightly different fields,
+
+kb_builder.py
+
+adds missing metadata.
+
+For example
+
+document id
+heading
+section id
+word count
+source
+tags
+
+Now telecom passages become identical to MultiDoc2Dial passages.
+
+So finally
+
+MultiDoc2Dial
+        +
+Telecom KB
+
+look exactly the same internally.
+Step 6 — Merge Everything
+
+Now all passages are merged into one large knowledge base.
+
+Final KB contains
+
+24933 MD2D passages
+
++
+
+1171 Telecom passages
+
+=
+
+26104 Total passages
+
+This merged KB is what the retriever searches. The combined totals are reflected in your generated statistics.
+
+Step 7 — Build Metadata Indexes
+
+After merging, three indexes are built.
+
+A) kb_passages.jsonl
+
+This is the main knowledge base.
+
+Contains all
+
+26104 passages
+
+Each passage contains
+
+passage_id
+text
+title
+domain
+category
+source
+
+This file is later converted into embeddings and indexed using FAISS.
+
+
+B) doc_index.json
+
+This is a document-level lookup table.
+
+Instead of storing every passage,
+
+it stores
+
+document id
+
+↓
+
+document metadata
+
+Example
+
+Document ID
+
+↓
+
+Title
+
+↓
+
+Domain
+
+↓
+
+Category
+
+↓
+
+Source
+
+This lets the system quickly find document information from a document ID.
+
+C) span_index.json
+
+This stores section-level mappings.
+
+Example
+
+Section ID
+
+↓
+
+Passage ID
+
+↓
+
+Document ID
+
+During retrieval, if a passage belongs to a particular section,
+
+the chatbot can directly identify
+
+which document it belongs to
+which section it came from.
+
+
+Step 8 — Compute Dataset Statistics
+
+Finally, statistics are calculated.
+
+Your project contains:
+
+Metric	Count
+Total Passages	26,104
+MultiDoc2Dial Passages	24,933
+Telecom Overlay Passages	1,171
+Total Documents	498
+MultiDoc2Dial Documents	488
+Telecom Documents	10
+Total Words	407,938
+
+
+What is the purpose of training_data_builder.py?
+
+After kb_builder.py, you already have:
+
+Knowledge Base (kb_passages.jsonl)
+Document Index
+Span Index
+
+But these are not training datasets.
+
+Machine learning models cannot train directly on a knowledge base.
+
+They need specially formatted examples.
+
+                MultiDoc2Dial Dialogues
+                          │
+                          │
+                Span Index (Knowledge Base)
+                          │
+                          ▼
+          training_data_builder.py
+                          │
+ ┌──────────────┬──────────────┬──────────────┬──────────────┐
+ │              │              │              │
+ ▼              ▼              ▼              ▼
+Retriever   Generator      DPO           Test Cases
+Dataset      Dataset      Dataset        Dataset
+
+Step 1 — Load Required Data
+
+MultiDoc2Dial Dialogues
+
+These contain conversations between users and agents.
+Span Index
+
+This comes from kb_builder.py.
+
+It tells the system:
+
+Question
+
+↓
+
+Correct document
+
+↓
+
+Correct section
+
+↓
+
+Correct passage
+
+Without this mapping, the system would not know which passage correctly answers a question.
+
+Step 2 — Build Retriever Training Data
+
+Now the script prepares data for the Retriever.
+
+The retriever learns:
+
+"Given a question, which passage should I retrieve?"
+
+Each training example contains:
+
+User Question
+
+↓
+
+Correct Passage (Positive)
+
+↓
+
+Wrong Passages (Hard Negatives)
+
+Example:
+
+Query
+
+How do I activate my Jio SIM?
+
+Positive
+
+Steps for SIM activation.
+
+Negative 1
+
+Recharge plans
+
+Negative 2
+
+Roaming charges
+
+Step 3 — Create Telecom Retriever Data
+
+MultiDoc2Dial does not contain many telecom questions.
+
+It:
+
+loads telecom passages,
+generates multiple realistic user queries,
+
+Step 4 — Merge Both Retriever Datasets
+
+Now both datasets are combined.
+
+MultiDoc2Dial Retriever Data
+
++
+
+Telecom Retriever Data
+
+↓
+
+retriever_train.jsonl
+
+Step 5 — Build Generator Training Data (SFT)
+
+The generator learns:
+
+"After retrieval, how should I answer the user?"
+
+Step 6 — Build DPO Dataset
+
+Next, it prepares data for Direct Preference Optimization (DPO).
+
+DPO does not learn from a single answer.
+
+Instead it learns from:
+
+Prompt
+
+↓
+
+Better Answer
+
+↓
+
+Worse Answer
+
+The script creates DPO data from two sources:
+
+Source 1 — MultiDoc2Dial
+
+The correct grounded agent answer is treated as the preferred response, while a deliberately longer, less concise version is created as the rejected response.
+Source 2 — SHP-2
+
+The SHP-2 dataset already provides:
+
+Prompt
+
+↓
+
+Chosen Answer
+
+↓
+
+Rejected Answer
+
+The script combines both sources into one DPO dataset.
+
+Step 7 — Build Evaluation Test Set
+
+Finally, the script creates test cases.
+
+These are never used for training.
+
+Instead, they are used to evaluate the chatbot.
+
+The evaluation set includes:
+
+MultiDoc2Dial validation examples
+Handcrafted telecom scenarios
+
+Examples include:
+
+roaming disputes,
+network outages,
+Complete Project Flow (Till training_data_builder.py)
+
+The first step of my project is download_datasets.py. Since a Retrieval-Augmented Generation (RAG) chatbot needs data before it can answer any questions, this script downloads all the required datasets from Hugging Face and stores them locally. It downloads the MultiDoc2Dial dialogue dataset, which contains customer and support-agent conversations, the MultiDoc2Dial document dataset, which contains the documents used by agents to answer customer questions, and the SHP-2 (Stanford Human Preferences) dataset, which contains prompts along with two different responses where one response has been preferred by humans over the other. The SHP-2 dataset is not used for answering questions; instead, it is used later for DPO (Direct Preference Optimization). DPO is the final fine-tuning stage where the language model learns which response is better when multiple responses are possible, making the chatbot's answers more natural, helpful, and aligned with human preferences. After downloading, all datasets are stored in the data/raw folder so they can be reused without downloading again.
+
+The next step is kb_builder.py. The main purpose of this file is to build the Knowledge Base (KB). A Knowledge Base is simply a collection of all the information that the chatbot can search when answering a user's question. Instead of searching the internet or raw datasets every time, the chatbot searches this organized knowledge base. First, kb_builder.py loads the MultiDoc2Dial document dataset and converts every document into small searchable passages with information such as passage ID, document ID, title, text, category, and source. Then it loads the telecom knowledge that was created using the telecom corpus builders, including information about billing, recharge, SIM activation, APN settings, roaming, network issues, customer support, device setup, and TRAI guidelines. Since these datasets come from different sources and have different formats, kb_builder.py converts all of them into one common format and merges them into a single knowledge base. Finally, it creates kb_passages.jsonl, which contains all searchable passages, doc_index.json for document lookup, span_index.json for mapping passages to their original documents, and dataset_stats.json for statistics. The final knowledge base contains 26,104 passages, including 24,933 MultiDoc2Dial passages and 1,171 telecom passages, across 498 documents, containing approximately 407,938 words. This knowledge base is later searched by the retriever whenever a user asks a question.
+
+After the knowledge base is created, the next step is training_data_builder.py. Although the knowledge base contains all the information, machine learning models cannot be trained directly from it. Different models require different types of training data. Therefore, this file converts the knowledge base and dialogue data into several specialized datasets. First, it loads the MultiDoc2Dial dialogues and the span index created during the previous step. Using this information, it creates the Retriever Training Dataset. The retriever is the part of the RAG system that finds the most relevant passage from the knowledge base for a user's question. To train it, the script creates examples consisting of a user query, the correct passage (positive example), and similar but incorrect passages (hard negatives). This teaches the retriever how to distinguish the correct passage from other similar passages. The script also creates additional telecom-specific retriever examples by generating realistic telecom queries from telecom passages and pairing them with appropriate positive and negative passages. Finally, both datasets are merged into retriever_train.jsonl, which is later used to train the retriever model.
+
+Next, the script creates the Generator Training Dataset. The generator is the language model that writes the final answer after the retriever has found the relevant information. To train the generator, the script combines three things: the user's question, the retrieved context from the knowledge base, and the correct answer given by the support agent. These examples are saved as generator_sft_train.jsonl and are used for Supervised Fine-Tuning (SFT), where the model learns how to generate accurate, grounded responses based on the retrieved context.
+
+After creating the generator dataset, the script prepares the DPO Training Dataset. DPO stands for Direct Preference Optimization. While Supervised Fine-Tuning teaches the model how to answer, DPO teaches the model which answer is better when multiple answers are possible. For this purpose, the script creates preference pairs consisting of a prompt, a preferred (chosen) response, and a less preferred (rejected) response. These preference pairs are created from both MultiDoc2Dial and the SHP-2 dataset. During DPO training, the model learns to generate responses that are closer to the preferred human responses and avoid responses that humans consider less useful. The final preference dataset is stored in dpo_pairs.jsonl.
+
+Finally, training_data_builder.py creates the Evaluation Dataset. This dataset is not used for training. Instead, it is used after training to measure how well the complete RAG system performs. The evaluation dataset contains customer questions, the correct document, the correct answer, and several handcrafted telecom scenarios such as roaming issues, billing disputes, network outages, complaint escalation, and eSIM activation. These examples are saved in test_cases.jsonl and are later used to evaluate retrieval accuracy, response quality, and overall chatbot performance.
+
+At the end of this stage, the project has successfully prepared all the datasets required for training and evaluation. Specifically, it generates:
+
+retriever_train.jsonl → used to train the Retriever, which finds the correct passage from the Knowledge Base.
+generator_sft_train.jsonl → used to train the Generator, which produces the final answer.
+dpo_pairs.jsonl → used for Direct Preference Optimization (DPO) so the model learns to prefer better human-like responses.
+test_cases.jsonl → used to evaluate the complete RAG system after training.
+
+train_retriever.py
+First understand the Retriever
+
+Suppose the user asks
+
+My Jio SIM is not activating.
+
+Knowledge Base has
+
+26,104 passages
+
+Should the chatbot read all 26,104 passages?
+
+No.
+
+Too slow.
+
+So first someone searches the library.
+
+That searcher is called
+
+Retriever
+
+It only finds the best passages.
+
+
+Purpose of train_retriever.py:
+
+Train the Retriever model so it can find the correct passage from the Knowledge Base when a user asks a question.
+
+Input of this file
+
+This file takes
+
+retriever_train.jsonl
+
+Which was created by
+
+training_data_builder.py
+
+Inside it
+
+Question
+
+Positive Passage
+
+Negative Passages
+
+Example
+
+Question
+
+How to activate eSIM?
+
+Positive
+
+eSIM activation guide
+
+Negative
+
+Recharge plans
+
+Negative
+
+Roaming charges
+
+Negative
+
+Complaint process
+
+Positive means
+
+Correct passage
+
+Negative means
+
+Wrong passage.
+
+
+Load Base Model
+
+BAAI/bge-large-en-v1.5
+
+Question
+
+Why not train from scratch?
+
+Because
+
+training from scratch
+
+needs
+
+millions of examples
+many GPUs
+several days
+
+Instead
+
+we start from an already intelligent model.
+
+This is called
+
+Pretrained Model.
+
+What is Embedding?
+
+This is one of the most common interview questions.
+
+Suppose
+
+Question
+
+How to recharge?
+
+Computer cannot understand English.
+
+So it converts
+
+sentence
+
+↓
+
+numbers
+
+Example
+
+[0.34,
+-0.22,
+0.91,
+...
+1024 numbers]
+
+This list of numbers is called
+
+Embedding
+
+Every question
+
+Every passage
+
+becomes
+
+1024 numbers.
+
+Now computer compares numbers.
+
+
+Step 3
+
+Evaluate BEFORE training
+
+Before training
+
+the project checks
+
+How good is the original Retriever?
+
+Example
+
+Question
+
+↓
+
+Find passage
+
+↓
+
+Correct?
+
+
+Suppose
+
+only
+
+65%
+
+correct.
+
+Store result.
+
+Later compare.
+
+This is called
+
+Baseline.
+
+Step 4
+
+Convert data
+
+Function
+
+triples_to_input_examples()
+
+Converts
+
+Question
+
++
+
+Positive Passage
+
+into
+
+SentenceTransformer format.
+
+Example
+
+InputExample
+
+Question
+
+↓
+
+Positive Passage
+
+Negative passages
+
+are NOT added here.
+
+Why?
+
+Because
+
+the loss function
+
+handles negatives automatically
+
+Step 5
+
+Loss Function
+
+MultipleNegativesRankingLoss
+
+Very common interview question.
+
+Simple example.
+
+Batch
+
+Question 1
+
+Positive 1
+
+Question 2
+
+Positive 2
+
+Question 3
+
+Positive 3
+
+Now
+
+For
+
+Question 1
+
+Correct
+
+Positive 1
+
+Wrong
+
+Positive 2
+
+Wrong
+
+Positive 3
+
+Automatically.
+
+So one batch
+
+creates many negative examples.
+
+This teaches
+
+Bring
+
+Question
+
+close to
+
+Correct Passage
+
+Move
+
+Wrong Passages
+
+far away.
+
+That's why it is called
+
+Multiple Negatives Ranking Loss (MNRL).
+
+Step 6
+
+Train Model
+
+Now training starts.
+
+Question
+
+↓
+
+Embedding
+
+↓
+
+Compare
+
+↓
+
+Calculate Loss
+
+↓
+
+Update weights
+
+↓
+
+Repeat
+
+This process runs
+
+2 epochs
+
+by default.
+
+Meaning
+
+the model sees the training data
+
+two times.
+
+Step 7
+
+Save Model
+
+After training
+
+checkpoints/
+
+↓
+
+retriever/
+
+contains
+
+trained Retriever.
+
+Now
+
+this model knows
+
+which passage matches
+
+which question.
+
+Step 8
+
+Evaluate Again
+
+Now
+
+same validation questions
+
+are asked again.
+
+Compare
+
+Before Training
+
+vs
+
+After Training.
+
+Metrics
+
+Recall@1
+
+Recall@5
+
+Recall@10
+
+MRR@10
+
+
+What is Recall@1?
+Suppose
+
+100 questions.
+
+Retriever returns
+
+only ONE passage.
+
+If
+
+80 passages are correct
+
+Recall@1
+
+=
+
+80%
+
+Recall@5
+
+Retriever returns
+
+Top 5 passages.
+
+If
+
+correct passage exists
+
+inside those 5
+
+for
+
+95 questions
+
+Recall@5
+
+95%
+
+MRR
+
+MRR
+
+checks
+
+How early
+
+the correct passage appears.
+
+Example
+
+Rank 1
+
+Correct
+
+Score
+
+1.0
+
+Rank 2
+
+1/2
+
+=
+
+0.5
+
+Rank 5
+
+1/5
+
+=
+
+0.2
+
+Higher MRR
+
+means
+
+correct passage appears nearer the top.
+
+
+faiss_indexer.py
+After training the retriever, how do we actually search 26,104 passages in milliseconds?
+
+
+First understand the problem
+
+Suppose your KB contains
+
+26,104 passages
+
+User asks
+
+How do I activate eSIM?
+
+The retriever converts this question into an embedding.
+
+Now imagine doing this
+
+Question embedding
+
+↓
+
+Compare with Passage 1
+
+↓
+
+Compare with Passage 2
+
+↓
+
+Compare with Passage 3
+
+↓
+
+...
+
+↓
+
+Compare with Passage 26,104
+
+This takes time.
+
+Imagine if tomorrow your company has
+
+1 million passages
+
+Searching one by one becomes extremely slow.
+
+So we need something faster.
+
+What is FAISS?
+
+FAISS stands for
+
+Facebook AI Similarity Search.
+
+Think of FAISS like Google Search for embeddings.
+
+Instead of searching words,
+
+it searches vectors (embeddings).
+
+What does faiss_indexer.py do?
+
+Its job is
+
+Convert every KB passage into embeddings and store them inside FAISS for fast searching
+
+
+Step 1
+
+Load Knowledge Base
+
+It first loads
+
+kb_passages.jsonl
+
+This contains
+
+26,104 passages
+
+Example
+
+Passage 1
+
+SIM Activation
+
+Passage 2
+
+Recharge
+
+Passage 3
+
+Roaming
+
+...
+
+This file was created by
+
+kb_builder.py
+
+Step 2
+
+Load trained Retriever
+
+Remember previous file?
+
+train_retriever.py
+
+It saved
+
+checkpoints/retriever
+
+Now this file loads it.
+
+Why?
+
+Because we want telecom-specific embeddings,
+
+not general English embeddings.
+
+The code loads the sentence-transformers model from the path you provide
+
+Step 3
+
+Create embeddings
+
+Now
+
+every passage
+
+becomes numbers.
+
+Example
+
+Passage
+
+How to activate SIM
+
+↓
+
+Embedding
+
+[0.21,
+0.48,
+-0.62,
+...
+1024 numbers]
+
+Next
+
+Recharge Guide
+
+↓
+
+Embedding
+
+[0.31,
+0.09,
+...
+]
+
+This repeats for
+
+26,104 passages
+
+Finally
+
+26,104 embeddings
+
+are created.
+
+The embed_passages() function encodes all passages and returns an array of embeddings.
+
+Step 4
+
+Normalize embeddings
+
+The code contains
+
+normalize_embeddings=True
+
+Question
+
+Why?
+
+Imagine
+
+Question embedding
+
+[1,
+2]
+
+Passage A
+
+[2,
+4]
+
+Passage B
+
+[-2,
+5]
+
+We don't care about size.
+
+We care about
+
+direction.
+
+Normalization makes all vectors have the same length.
+
+Then
+
+FAISS compares
+
+meaning
+
+not magnitude.
+
+This allows inner product search to behave like cosine similarity.
+
+
+Step 5
+
+Build FAISS Index
+
+Now embeddings are ready.
+
+We create
+
+FAISS Index
+
+Code uses
+
+IndexFlatIP
+
+Question
+
+What is IndexFlatIP?
+
+Think
+
+Excel Sheet
+
+Row 1
+
+Embedding
+
+Row 2
+
+Embedding
+
+Row 3
+
+Embedding
+
+FAISS stores every embedding.
+
+Now searching becomes very fast.
+Why IndexFlatIP?
+
+The comments explain why:
+
+Exact search (no approximation).
+Good for your current corpus size.
+Uses inner product, which equals cosine similarity after normalization.
+If the corpus becomes much larger (for example, over 100,000 passages), another FAISS index type such as IndexIVFFlat would be more suitable.
+
+Step 6
+
+Store IDs
+
+Suppose
+
+Embedding
+
+Row 521
+
+What passage is this?
+
+FAISS doesn't know.
+
+So
+
+Row 521
+
+↓
+
+Passage 521
+
+must be stored.
+
+The code uses
+
+IndexIDMap
+
+to map
+
+Embedding
+
+↓
+
+Passage ID
+
+This mapping lets the system retrieve the original passage after finding the matching vector.
+
+
+Step 7
+
+Save everything
+
+The script saves three important files.
+
+1
+finetuned_faiss.index
+
+Contains
+
+All embeddings
+
+Think
+
+Search Database
+2
+finetuned_passage_store.json
+
+Contains
+
+Passage ID
+
+↓
+
+Actual Passage
+
+Example
+
+521
+
+↓
+
+SIM activation guide
+3
+finetuned_index_meta.json
+
+Contains
+
+Number of passages
+
+Embedding dimension
+
+Index type
+
+Source statistics
+
+These files are written by the save_index() function.
+
+Step 8
+
+DenseRetriever
+
+This class is the real retriever used by the chatbot.
+
+Previously
+
+we only trained
+
+the embedding model.
+
+Now
+
+we combine
+
+Embedding Model
+
++
+
+FAISS
+
+This becomes
+
+DenseRetriever
+
+The DenseRetriever loads:
+
+the fine-tuned embedding model,
+the FAISS index,
+the stored passage metadata.
+
+How search works
+
+User asks
+
+How do I activate eSIM?
+
+Step 1
+
+Convert question into embedding.
+
+Question
+
+↓
+
+Embedding
+
+Step 2
+
+Search FAISS.
+
+Embedding
+
+↓
+
+FAISS
+
+Step 3
+
+FAISS returns
+
+Top 5 embeddings.
+
+Step 4
+
+Using stored IDs
+
+retrieve
+
+Actual passages.
+
+Step 5
+
+Send them
+
+to Generator.
+
+The search() method performs exactly these steps and returns the top passages with a similarity score.
+
+Why is it called Dense Retriever?
+
+Two retrieval approaches exist.
+
+Sparse Retrieval
+
+Matches
+
+Exact words
+
+Example
+
+Recharge
+
+↓
+
+Recharge
+
+Old search engines like BM25 work this way.
+
+Dense Retrieval
+
+Matches
+
+Meaning
+
+Example
+
+Recharge my phone
+
+↓
+
+Top-up mobile
+
+Words are different.
+
+Meaning is same.
+
+Embedding similarity finds it.
+
+Since your retriever uses embeddings,
+
+it is called
+
+Dense Retriever.
+
+
+Why do we need a Generator?
+
+Suppose a user asks
+
+"Why is my 5G slow?"
+
+Your Retriever searches FAISS and returns:
+
+Passage 1:
+5G speed depends on coverage.
+
+Passage 2:
+Restart your device.
+
+Passage 3:
+Network congestion may reduce speed.
+
+Now think like a customer.
+
+Would you like to see
+
+Passage 1
+Passage 2
+Passage 3
+
+No.
+
+You expect
+
+Your 5G may be slow because of weak coverage,
+temporary congestion, or device settings.
+Restart your phone and check network coverage.
+
+Who writes this answer?
+
+The Generator.
+
+That is why this file exists.
+
+Retriever
+
+Imagine searching Google.
+
+You type
+
+Best recharge plan
+
+Google shows
+
+Website 1
+
+Website 2
+
+Website 3
+
+Google Search is like the Retriever
+
+If Retriever is already finding passages...
+Why do we need a Reranker?
+
+Imagine you ask Google
+
+"How do I activate my SIM?"
+
+Google returns
+
+1. SIM Replacement
+
+2. Recharge Plan
+
+3. SIM Activation
+
+4. International Roaming
+
+5. Port Number
+
+Notice something?
+
+The correct answer
+
+SIM Activation
+
+is only at position 3.
+
+If our Generator reads only the first few passages,
+
+it may never even see the correct answer.
+
+That is the problem.
+
+So what does the Reranker do?
+
+Retriever says
+
+"These 20 passages look relevant."
+
+Reranker says
+
+"Among these 20,
+this one is the BEST."
+
+Simple analogy
+
+Imagine
+
+100 students apply for a job.
+
+HR
+
+selects
+
+Top 20 resumes.
+
+That is
+
+Retriever.
+
+Manager
+
+interviews those 20.
+
+Finally selects
+
+Top 3.
+
+That is
+
+Reranker.
+
+Why can't Retriever directly return Top 3?
+
+Because Retriever compares
+
+Question
+
+↓
+
+Passage
+
+separately.
+
+It converts both into embeddings.
+
+Then compares vectors.
+
+This is called
+
+Bi-Encoder.
+
+It is very fast.
+
+But
+
+sometimes
+
+it misses fine details
+What is the Reranker doing differently?
+
+Look at the top comments.
+
+It says
+
+Cross Encoder
+
+instead of
+
+Bi Encoder
+
+This is the biggest idea of this file.
+Bi-Encoder vs Cross-Encoder
+
+Suppose
+
+Question
+
+How do I activate SIM?
+
+Passage
+
+Restart your phone after inserting SIM.
+
+Retriever (Bi-Encoder)
+
+Retriever reads
+
+Question
+
+alone.
+
+↓
+
+Makes embedding.
+
+Then
+
+reads
+
+Passage
+
+alone.
+
+↓
+
+Makes embedding.
+
+Finally
+
+compares
+
+both vectors.
+
+Very fast.
+
+Reranker (Cross-Encoder)
+
+Cross Encoder
+
+puts them together.
+
+Question
+
++
+
+Passage
+
+↓
+
+Model
+
+↓
+
+Relevance Score
+
+every word in the question
+
+can directly interact
+
+with every word
+
+inside the passage.
+
+That makes it much more accurate
+
+Why don't we use Cross Encoder everywhere?
+
+Because it is slow.
+
+Imagine
+
+Knowledge Base
+
+has
+
+26,104 passages.
+
+If Cross Encoder compares
+
+Question
+
+with
+
+26,104 passages,
+
+it becomes extremely slow.
+
+Instead
+
+we do
+
+Retriever
+
+↓
+
+Top 20
+
+↓
+
+Cross Encoder
+
+↓
+
+Top 3
+
+Only 20 comparisons.
+
+Much faster
+
+
+What model is used?
+
+Your code uses
+
+cross-encoder/ms-marco-MiniLM-L-6-v2
+User asks a question
+
+        │
+
+        ▼
+
+Retriever searches the entire library
+
+        │
+
+        ▼
+
+Top 20 candidate passages
+
+        │
+
+        ▼
+
+Reranker acts like an interview panel
+
+        │
+
+        ▼
+
+Scores every candidate individually
+
+        │
+
+        ▼
+
+Sorts them from best to worst
+
+        │
+
+        ▼
+
+Top 3 passages
+
+        │
+
+        ▼
+
+Generator writes the final answer
+
+
+
+
+
+Generator
+
+Now imagine someone reads those websites
+
+and explains everything in one paragraph.
+
+That person is the Generator.
+
+Why can't the Retriever answer?
+
+Retriever only knows
+
+Which passage is relevant?
+
+It does not know
+
+How should I explain this?
+
+Which model is used?
+
+Look at the beginning of your file.
+
+It says
+
+Base model:
+google/flan-t5-small
+
+Why FLAN-T5(Seq2Seq model)?
+
+Remember
+
+BGE
+
+was trained for
+
+Finding similar text.
+
+It is not good at writing answers.
+
+FLAN-T5 is different.
+
+It is trained for
+
+Question Answering
+
+Summarization
+
+Translation
+
+Instruction Following
+
+Text Generation
+
+So it is perfect for
+
+Context
+
++
+
+Question
+
+↓
+
+Answer
+
+Exactly what we need.
+
+What data does it use?
+
+training_data_builder.py
+
+created
+
+generator_sft_train.jsonl
+
+This file contains
+
+Question
+
+Context
+
+Correct Answer
+
+Citation
+
+Example
+
+Question
+
+↓
+
+How do I activate my SIM?
+
+Context
+
+↓
+
+SIM activation guide...
+
+Correct Answer
+
+↓
+
+Restart your phone and wait
+30 minutes.
+
+Citation
+
+↓
+
+[SOURCE: sim_doc_01]
+
+What does train_generator.py teach?
+
+Instead of teaching
+
+Question
+
+↓
+
+Passage
+
+like the Retriever,
+
+it teaches
+
+Question
+
++
+
+Context
+
+↓
+
+Answer
+
+That is a huge difference.
+
+What is the final output?
+
+After training
+
+it saves
+
+checkpoints/generator
+
+This contains
+
+Fine-tuned FLAN-T5 model
+
+Later
+
+inference_pipeline.py
+
+loads this model.
+
+Real-life analogy
+
+Imagine a hospital.
+
+Patient asks
+
+I have chest pain.
+Retriever
+
+Doctor searches
+
+medical books.
+
+Finds
+
+Book 1
+
+Book 2
+
+Book 3
+Generator
+
+Doctor reads them
+
+and tells the patient
+
+Your symptoms suggest...
+Take these medicines...
+Visit immediately if...
+
+Doctor's explanation
+
+=
+
+Generator.
+
+Medical books
+
+=
+
+Knowledge Base.
+
+Searching books
+
+=
+
+Retriever.
+
+why use flan-t5 ?
+We needed a model that could generate answers from retrieved documents
+FLAN-T5-Small is an instruction-tuned Seq2Seq model so it already understands question-answering tasks
+It is lightweight, fast to fine-tune, and can run on limited GPU resources while still providing good generation quality
+FLAN-T5-Small offered the best balance between performance and computational cost
+
+Why not BERT?
+BERT is an encoder-only model. It is mainly designed for understanding text, such as classification or sentiment analysis. Our task requires generating complete answers, so BERT is not suitable for answer generation.
+
+Why not GPT
+GPT models are decoder-only models and are excellent at text generation. However, FLAN-T5 is an instruction-tuned Seq2Seq model, which naturally fits tasks where we provide context and ask a question. It is also much lighter and easier to fine-tune on limited hardware
+
+Why not Mistral?
+Mistral is a much larger decoder-only language model that generally produces better responses
+
+Why not Llama?
+Llama models provide excellent generation quality but are considerably larger and require more GPU memory and longer training time
+
+Why not T5 (Original)?
+FLAN-T5 is built on T5 but is instruction-tuned. Because of this additional instruction tuning, it follows prompts and question-answering instructions much better than the original T5
+
+Why not train from scratch?
+Training a language model from scratch requires enormous datasets, weeks of training, and expensive GPU clusters
+
+tool_executor.py:
+
+Question:
+
+Is this enough for a telecom company?
+
+Answer: No.
+
+Why?
+
+Suppose a customer asks:
+
+"Is there a network outage in Ahmedabad?"
+
+Can your Knowledge Base answer that?
+
+No.
+
+Because the Knowledge Base only contains documents.
+
+
+Another question
+
+"Please create a complaint."
+
+Can the Knowledge Base create tickets?
+
+No.
+
+Another
+
+"Show me the exact TRAI policy."
+
+Generator cannot search policy files by itself.
+
+
+What is a Tool?
+Simple definition
+
+A tool is simply a special skill that the AI can use.
+
+
+Human analogy
+
+Imagine a customer calls Airtel support.
+
+Support Executive
+
+↓
+
+Customer says
+
+My network is down.
+
+Can the executive answer from memory?
+
+No.
+
+He opens
+
+Network Dashboard
+
+That dashboard is a Tool.
+
+Customer says
+
+Create complaint.
+
+Executive opens
+
+Ticket Portal
+
+That is another Tool.
+
+Customer says
+
+Show official policy.
+
+Executive opens
+
+Policy Document
+
+That is another Tool.
+Because this file executes whichever tool is requested.
+
+It doesn't decide which tool to use.
+
+It only runs the requested tool.
+Think of a restaurant
+
+Customer
+
+↓
+
+Orders Pizza
+
+↓
+
+Waiter
+
+↓
+
+Kitchen
+
+The waiter does NOT cook.
+
+The waiter simply sends the request.
+
+ToolExecutor is that waiter.
+
+Tool 1
+SearchKB
+
+Question
+
+Search telecom documents
+
+Tool 2
+GetPolicy
+
+Question
+
+Show me the FULL policy.
+
+Notice the difference.
+
+SearchKB returns
+
+Top Passage
+
+Suppose it returns
+
+TRAI Policy Section 4.2
+
+Customer now says
+
+Show entire policy.
+
+SearchKB cannot.
+
+So another tool opens the original document.
+
+That is
+
+GetPolicy
+
+
+Tool 3
+CreateTicket
+
+Question
+
+Customer says
+
+My account is hacked.
+
+Should AI answer only?
+
+No.
+
+Someone from telecom company must investigate.
+
+So AI creates
+
+Support Ticket
+
+Tool 4
+CheckNetworkStatus
+
+This is the coolest tool in your project.
+
+Also your novel contribution.
+
+The comment itself marks it as a NOVEL TOOL.
+Question
+
+Customer says
+
+My 5G is not working.
+
+Old chatbot
+
+↓
+
+Replies
+
+Restart phone.
+
+But...
+
+Imagine
+
+Entire Ahmedabad tower is down.
+
+Restarting phone is useless.
+
+Instead
+
+AI first checks
+
+Live Network Status
+
+If tower is down
+
+AI replies
+
+There is an outage.
+
+instead of
+
+Restart phone.
+
+Much smarter.
+
+Why is this called Novel?
+
+Because
+
+Traditional RAG
+
+only searches documents.
+
+Your project
+
+also checks
+
+live network conditions.
+
+That makes it different.
+
+Why Tool Schemas?
+
+Very common interview question.
+
+Suppose AI has
+
+4 tools.
+
+How does Generator know
+
+what tools exist?
+
+Someone has to describe them.
+
+Tool Schema is simply
+
+Tool Name
+
+↓
+
+Purpose
+
+↓
+
+Parameters
+
+Like
+
+Restaurant Menu.
+
+Pizza
+
+Ingredients
+
+Price
+
+The schema tells the AI:
+
+tool name
+what it does
+required inputs
+
+without running it.
+
+Why not call SearchKB directly?
+
+Because tomorrow
+
+you may add
+
+Payment Tool
+
+Location Tool
+
+Recharge Tool
+
+SIM Tool
+
+The pipeline never changes.
+
+It always talks only to
+
+ToolExecutor.
+
+1. Which library is used to make the Agent?
+
+According to your project:
+
+There is no LangChain, LangGraph, CrewAI, AutoGen, or LlamaIndex Agent used.
+
+Instead, your project implements a custom agent in Python.
+
+The main components are:
+
+User Query
+      │
+      ▼
+Tool Policy Classifier   (decides WHICH tool)
+      │
+      ▼
+ToolExecutor             (executes THAT tool)
+      │
+      ▼
+Generator (Mistral)
+
+
+So your "agent" is simply the combination of:
+
+Tool Policy Classifier
+ToolExecutor
+Generator
+
+Customer says:
+
+"My network is down."
+
+Does the receptionist immediately go to the network room?
+
+No.
+
+First, someone decides:
+
+"This is a network issue."
+
+Then it is forwarded.
+
+Your project works exactly like that.
+
+User Question
+
+↓
+
+Tool Policy Classifier
+
+↓
+
+Tool Name
+
+↓
+
+ToolExecutor
+
+↓
+
+Correct Tool
+
+User:
+
+My signal is weak.
+
+Tool Policy Classifier decides
+
+CheckNetworkStatus
+
+Then ToolExecutor runs
+
+CheckNetworkStatus.execute(...)
+
+
+How does AI know the tower is down?
+
+This is the most important concept.
+
+The AI does not know by itself.
+
+It asks another system.
+
+Imagine this:
+
+Customer
+↓
+
+AI
+
+↓
+
+Network Dashboard
+
+↓
+
+Dashboard replies:
+Tower Down
+
+The AI is just reading the answer.
+
+It checks:
+
+network_status.json
+
+Example:
+
+{
+  "ahmedabad": {
+      "status": "operational"
+  },
+  "mumbai": {
+      "status": "partial_outage"
+  }
+}
+
+If it finds
+
+status = partial_outage
+
+it replies
+
+"There is currently a network outage."
+
+SearchKBTool
+
+We already know SearchKB is a tool.
+
+Now let's understand its philosophy.
+
+Step 1
+
+Try
+
+Dense Retriever
+
+If available
+
+↓
+
+Use it.
+
+Step 2
+
+If not
+
+↓
+
+Use
+
+BM25
+
+as backup.
+
+Your comments explicitly mention this fallback behaviour
+
+
+Why BM25 fallback?
+
+Interview answer:
+
+Because the AI should still function even if the trained retriever checkpoint is unavailable.
+
+GetPolicyTool
+
+Think about a university library.
+
+Search
+
+↓
+
+Finds
+
+Machine Learning Book
+
+Now you say
+
+Open Chapter 5.
+
+Search is finished.
+
+Now the librarian fetches the actual chapter.
+
+That is GetPolicyTool.
+
+It directly looks up the required section from the span index and returns the complete authoritative text.
+CreateTicketTool
+
+Imagine visiting a bank.
+
+Some problems
+
+Cash withdrawal
+
+↓
+
+Solved immediately.
+
+Others
+
+Fraud investigation
+
+↓
+
+Need a case number.
+
+So the bank creates
+
+Case ID
+
+Your project creates
+
+Ticket ID
+
+and stores it for future tracking.
+
+ToolExecutor
+
+This is just the receptionist.
+
+It keeps all tools together.
+
+SearchKB
+
+GetPolicy
+
+CreateTicket
+
+CheckNetworkStatus
+
+When told
+
+Run SearchKB
+
+it forwards the request to SearchKB.
+
+When told
+
+Run CreateTicket
+
+it forwards the request there.
+
+It never makes business decisions.
+
+Example 1
+
+User
+
+My account was hacked.
+
+AI says
+
+Create Ticket.
+
+No guessing.
+
+Example 2
+
+User
+
+I was charged Rs. 12000.
+
+Since it is a high-value dispute,
+
+AI escalates.
+
+Example 3
+
+User
+
+I want to talk to a human.
+
+Immediately
+
+↓
+
+Escalation.
+
+Analogy
+
+Suppose you're demonstrating an online shopping website.
+
+You don't connect to Amazon's real warehouse.
+
+Instead,
+
+you create fake products.
+
+Similarly,
+
+your project creates fake network information like:
+
+Mumbai → Partial Outage
+
+Ahmedabad → Operational
+
+Delhi → Operational
+
+This lets the project behave as if it were connected to a live telecom system during demonstrations.
+
+Question 1: How often does CheckNetworkStatus fetch data?
+
+There are two answers.
+
+In YOUR project
+
+It does not fetch continuously.
+Your code simply loads network_status.json when the tool starts and reads from it whenever the tool is called. The comments state that this JSON is a mock feed used instead of a real network API.
+
+Tool starts
+      │
+      ▼
+Read network_status.json
+      │
+      ▼
+Store in memory
+      │
+      ▼
+Whenever user asks
+      │
+      ▼
+Return matching region
+
+Question 2: How does the Agent know which tool to call?
+
+Question 2: How does the Agent know which tool to call?
+
+This is the biggest concept.
+
+Let's imagine you're working in a hospital.
+
+Patient comes.
+
+Says
+
+I have chest pain.
+
+Does the receptionist randomly send them somewhere?
+
+No.
+
+The receptionist first understands
+
+Chest Pain
+
+↓
+
+Cardiology
+
+Now suppose
+
+Patient says
+
+I need my medical record.
+
+Receptionist sends
+
+Medical Records Department
+
+Notice
+
+Nobody is guessing.
+
+Someone is classifying the request.
+
+Your AI Agent does exactly the same thing
+
+Complete Agent Flow
+Step 1
+
+User asks
+
+Why is my 5G slow in Ahmedabad?
+Step 2
+
+Question goes to
+
+Tool Policy Classifier
+
+NOT to SearchKB.
+
+NOT to Generator.
+
+First,
+
+Tool Policy Classifier.
+
+Step 3
+
+Tool Policy Classifier thinks
+
+This looks like
+
+↓
+
+Network Issue
+
+So it predicts
+
+CheckNetworkStatus
+
+We'll study exactly how it predicts when we read tool_policy_classifier.py.
+
+Step 4
+
+ToolExecutor receives
+
+Tool
+
+↓
+
+CheckNetworkStatus
+
+ToolExecutor simply executes that tool.
+
+It never decides.
+
+Step 5
+
+Tool executes
+
+Since this is your project
+
+it reads
+
+network_status.json
+
+Suppose JSON says
+
+{
+"Ahmedabad":
+{
+"status":"major_outage"
+}
+}
+
+Tool returns
+
+Major Outage
+Step 6
+
+Now Generator gets
+
+User Question
+
++
+
+Tool Result
+
+↓
+
+Answer
+
+Generator writes
+
+There is currently a major network outage in Ahmedabad. Our engineers are working to restore service.
+
+
+tool_policy_classifier.py
+
+"How does the Agent decide which tool to call?"
+
+First, let me correct one thing from our previous discussion
+
+Earlier we said
+
+Agent
+
+↓
+
+ToolExecutor
+
+↓
+
+Tool
+
+That is not completely correct.
+
+The actual flow in your project is
+
+User
+
+↓
+
+TrainedToolPolicy  ← Brain
+
+↓
+
+Tool Calls
+
+↓
+
+ToolExecutor
+
+↓
+
+Execute Tool
+
+↓
+
+Generator
+
+↓
+
+Final Answer
+
+
+Customer says
+
+Refund policy?
+
+Employee thinks
+
+Policy Question
+
+↓
+
+Open Policy Database
+
+Customer says
+
+I want to complain.
+
+Employee thinks
+
+Complaint
+
+↓
+
+Create Ticket
+
+Notice something?
+
+Nobody memorizes keywords.
+
+The employee understands
+
+what type of request it is.
+
+That is exactly what this classifier does.
+
+
+
+What is Classification?
+
+Suppose I ask
+
+My 5G is slow.
+
+Can you tell
+
+without searching
+
+that this is
+
+a
+
+Network Issue
+
+Yes.
+
+That is classification.
+
+
+
+Another
+
+Show me TRAI Policy.
+
+Immediately
+
+you know
+
+Policy Query
+
+Another
+
+Please escalate.
+
+Immediately
+
+Complaint
+
+Exactly the same thing happens here
+
+
+What is this model?
+
+Your code uses
+
+Tiny BERT
+
+Model
+
+google/bert_uncased_L-4_H-256_A-4
+
+for sequence classification.
+
+Notice
+
+NOT
+
+Generator.
+
+NOT
+
+Retriever.
+
+It is simply a
+
+Classifier.
+
+
+Why use BERT?
+BERT is extremely good at
+
+Understanding
+
+↓
+
+Classification
+
+It doesn't need to generate text.
+
+It only needs to answer
+
+Which Tool?
+
+Exactly one label.
+
+
+Why train it?
+
+Question
+
+Why not use keywords?
+
+Like
+
+if "network"
+
+↓
+
+Network Tool
+
+Good question.
+
+Imagine
+
+Customer says
+
+My internet keeps disconnecting.
+
+No word
+
+Network
+
+exists.
+
+But
+
+you know
+
+it is
+
+network problem.
+
+Training Data
+
+Where did BERT learn?
+It creates
+
+hundreds of examples.
+
+Example
+
+How do I dispute charge?
+
+↓
+
+SearchKB
+
+Example
+
+What does section 4.2 say?
+
+↓
+
+GetPolicy
+
+Example
+
+My account hacked.
+
+↓
+
+CreateTicket
+
+Example
+
+No signal.
+
+↓
+
+CheckNetworkStatus
+
+These become the model's training data.
+
+What happens after training?
+
+Now
+
+Customer asks
+
+My internet is slow.
+
+BERT predicts
+
+CheckNetworkStatus
+
+97%
+
+Notice
+
+It also gives
+
+Confidence.
+
+Very important.
+
+Why confidence?
+
+Suppose
+
+Customer says
+
+My phone problem...
+
+Maybe
+
+Device?
+
+Maybe
+
+Network?
+
+Maybe
+
+SIM?
+
+Model isn't sure.
+
+Confidence becomes
+
+0.42
+
+Very low.
+Your code says
+
+If confidence
+
+< 0.60
+
+↓
+
+Don't trust BERT
+
+↓
+
+Use Rule-Based
+
+Why fallback?
+
+Interview question.
+
+Suppose
+
+AI is only
+
+40% sure.
+
+Would you trust it?
+
+No.
+
+Instead
+
+fallback to
+
+simple rules.
+
+Much safer.
+
+This is how good production systems work
+AI
+
+↓
+
+Very confident
+
+↓
+
+Use AI
+
+────────────
+
+Not confident
+
+↓
+
+Backup Rules
+
+
+What is predict()?
+
+This is actually
+
+the
+
+Brain Function.
+
+Input
+
+User Question
+
+Output
+
+Tool
+
++
+
+Confidence
+
+Nothing more.
+
+Analogy
+
+Doctor.
+
+Patient speaks.
+
+Doctor immediately thinks
+
+Heart Problem
+
+95%
+
+Exactly what
+
+predict()
+
+does.
+
+
+What is get_tool_calls()?
+
+This is one of the smartest parts.
+
+Notice something.
+
+Suppose
+
+BERT predicts
+
+CheckNetworkStatus
+
+Does pipeline directly call
+
+Network Tool?
+
+No.
+
+Instead
+
+it builds
+
+a plan.
+
+Example
+
+SearchKB
+
+↓
+
+NetworkStatus
+
+Why?
+
+Because
+
+Even network problems
+
+may require
+
+KB information.
+
+So
+
+multiple tools
+
+can be used together
+
+
+Human analogy
+
+Suppose
+
+Customer says
+
+No Signal
+
+Support Executive thinks
+
+Step 1
+
+Open Customer History.
+
+Step 2
+
+Check Tower.
+
+Step 3
+
+Answer.
+
+That
+
+Step-by-step plan
+
+is
+
+get_tool_calls().
+
+
+Why not only CheckNetworkStatus?
+Because
+
+Customer may also ask
+
+Why is network slow?
+
+Any compensation?
+
+Compensation policy
+
+comes from
+
+KB.
+
+Network status
+
+comes from
+
+Network Tool.
+
+Need both.
+
+_infer_category()
+
+Another small intelligence.
+
+Suppose
+
+User asks
+
+Bill refund.
+
+Category
+
+↓
+
+Billing.
+
+Suppose
+
+User asks
+
+SIM activation.
+
+↓
+
+Device.
+
+Suppose
+
+Roaming charges.
+
+↓
+
+Roaming.
+
+It simply categorizes the query to improve the KB search
+_extract_region()
+
+Question
+
+No signal in Ahmedabad.
+
+How does
+
+Network Tool know
+
+city?
+
+This function extracts
+
+Ahmedabad
+
+and passes it as a parameter.
+
+If no supported city is found,
+
+it returns "Unknown".
+
+Rule-Based Prediction
+
+Suppose
+
+Model loading failed.
+
+Or
+
+confidence low.
+
+Should chatbot stop?
+
+No.
+
+Use rules.
+
+Example
+
+signal
+
+↓
+
+Network
+
+Simple.
+
+Reliable.
+
+Always works.
+
+if i automatic labelling then how there is possible just give small idea 
+
+1. Rule-Based Auto Labelling (Simplest)
+
+Create rules.
+
+If query contains:
+
+"network", "4G", "5G", "signal"
+↓
+
+Label = CheckNetworkStatus
+
+"policy", "TRAI", "terms"
+↓
+
+Label = GetPolicy
+
+"complaint", "fraud", "supervisor"
+↓
+
+Label = CreateTicket
+
+Else
+
+↓
+
+SearchKB
+
+Then generate thousands of labels automatically.
+
+Pros: Easy and fast.
+
+Cons: Doesn't understand meaning.
+
+2. Historical Customer Logs (Most Common in Industry)
+
+Suppose telecom has this data:
+
+Customer Query	Tool Actually Used
+My 4G is slow	CheckNetworkStatus
+Show roaming policy	GetPolicy
+I want to complain	CreateTicket
+
+The support agent's actions become the labels.
+
+No manual work needed.
+
+3. LLM-Assisted Labelling (Very Popular Today)
+
+Use GPT (or another LLM) to label data.
+
+Example prompt:
+
+You are a telecom expert.
+
+Available tools:
+- SearchKB
+- GetPolicy
+- CreateTicket
+- CheckNetworkStatus
+
+Question:
+"My 5G is not working."
+
+Return only the best tool.
+
+GPT replies:
+
+CheckNetworkStatus
+
+Now save:
+
+"My 5G is not working."
+↓
+
+CheckNetworkStatus
+
+Review a small sample manually to ensure quality, then train BERT.
+
+                           USER
+                             │
+                             ▼
+         User enters a telecom-related question
+                             │
+                             ▼
+      Example:
+      "My 5G is not working in Ahmedabad."
+                             │
+                             ▼
+──────────────────────────────────────────────────────────
+        STEP 1 : TOOL POLICY CLASSIFIER (BERT)
+──────────────────────────────────────────────────────────
+
+Input:
+"My 5G is not working in Ahmedabad."
+
+        │
+        ▼
+
+Tiny BERT reads the sentence.
+
+It DOES NOT answer.
+
+It only understands:
+
+"What type of problem is this?"
+
+        │
+        ▼
+
+Prediction:
+
+CheckNetworkStatus
+
+Confidence = 0.97
+
+        │
+        ▼
+
+If confidence >= 0.60
+
+↓
+
+Use AI prediction
+
+Else
+
+↓
+
+Use rule-based prediction
+
+        │
+        ▼
+
+Creates Tool Execution Plan
+
+Example:
+
+[
+ SearchKB,
+ CheckNetworkStatus
+]
+
+        │
+        ▼
+──────────────────────────────────────────────────────────
+      STEP 2 : TOOL EXECUTOR
+──────────────────────────────────────────────────────────
+
+ToolExecutor receives
+
+[
+ SearchKB,
+ CheckNetworkStatus
+]
+
+It still does NOT answer.
+
+It simply executes tools one by one.
+
+        │
+        ├──────────────────────────────────┐
+        ▼                                  ▼
+
+───────────────────────             ──────────────────────
+SearchKB Tool                    CheckNetworkStatus Tool
+───────────────────────             ──────────────────────
+
+SearchKB first searches
+telecom knowledge.
+
+Internally
+
+SearchKB
+
+↓
+
+Dense Retriever
+
+↓
+
+FAISS Index
+
+↓
+
+Top 20 passages
+
+↓
+
+Reranker
+
+↓
+
+Top 5 passages
+
+
+Meanwhile
+
+Network Tool
+
+↓
+
+Reads network_status.json
+(in your project)
+
+↓
+
+Returns
+
+Status = Major Outage
+
+        │
+        └──────────────┬─────────────────────
+                       ▼
+
+Tool Results
+
+↓
+
+Top Telecom Passages
+
++
+
+Network Status
+
+↓
+
+Sent to Generator
+
+──────────────────────────────────────────────────────────
+STEP 3 : GENERATOR (Mistral)
+──────────────────────────────────────────────────────────
+
+Generator receives
+
+1. Original Question
+
+2. Retrieved Passages
+
+3. Network Status
+
+4. Tool Results
+
+Generator combines everything
+
+↓
+
+Produces natural English
+
+↓
+
+"There is currently a major network outage
+in Ahmedabad. Our engineers are working
+to restore service."
+
+↓
+
+Final Answer
+
+↓
+
+User
+
+
+Let's understand this with one real example
+User asks
+
+"My 5G is not working in Ahmedabad."
+
+Step 1
+
+Question reaches
+
+TrainedToolPolicy
+
+BERT thinks
+
+This is a network issue.
+
+Prediction
+
+CheckNetworkStatus
+
+Confidence 96%
+
+Since confidence is high
+
+↓
+
+No fallback.
+
+Step 2
+
+Tool Policy builds
+
+SearchKB
+
++
+
+CheckNetworkStatus
+
+Why SearchKB?
+
+Maybe there is troubleshooting advice.
+
+Why Network Tool?
+
+Maybe the tower is actually down.
+
+Need both.
+
+Step 3
+
+ToolExecutor runs
+
+First
+
+SearchKB
+
+SearchKB
+
+↓
+
+Dense Retriever
+
+↓
+
+FAISS
+
+↓
+
+Top20
+
+↓
+
+Reranker
+
+↓
+
+Top5 passages
+
+Then
+
+CheckNetworkStatus
+
+Reads
+
+network_status.json
+
+Suppose
+
+Ahmedabad
+
+↓
+
+Major Outage
+Step 4
+
+Generator now receives
+
+Question
+
++
+
+Top Telecom Passages
+
++
+
+Network Status
+
+Generator writes
+
+"There is currently a network outage in Ahmedabad. Our engineers are working on it. Expected restoration is 2 hours."
+
+hf_mistral_generator.py
+
+Till now your project learned
+
+User
+
+↓
+
+Find correct tool
+
+↓
+
+Search KB
+
+↓
+
+Check Network
+
+↓
+
+Get Policy
+
+↓
+
+Create Ticket
+
+Now you have lots of information.
+
+Question:
+
+Who will convert all this information into a nice English answer?
+
+Answer:
+
+Mistral Generator
+
+What is this file?
+
+Simple answer
+
+This file sends a prompt to Mistral through OpenRouter and returns the generated response.
+Complete Flow
+User Question
+
+↓
+
+Retriever
+
+↓
+
+Reranker
+
+↓
+
+Tool Results
+
+↓
+
+Prompt
+
+↓
+
+Mistral
+
+↓
+
+Beautiful English Answer
+
+↓
+
+User
+Notice
+
+This file NEVER searches.
+
+Never retrieves.
+
+Never reranks.
+
+Never decides tools.
+
+It only
+
+Prompt
+
+↓
+
+Mistral
+
+↓
+
+Response
+
+Why use OpenRouter?
+
+Question
+
+Can Python directly run Mistral?
+
+No.
+
+Because your project uses
+
+OpenRouter
+
+OpenRouter is simply
+
+a gateway.
+
+What is payload?
+
+Question
+
+How does Mistral know
+
+what you want?
+
+Because Python sends
+
+a
+
+payload.
+
+Think of payload as
+
+an order form.
+
+Restaurant analogy
+
+Customer
+
+↓
+
+Order Form
+
+Pizza
+
+Medium
+
+Extra Cheese
+
+Kitchen knows
+
+what to cook.
+
+Exactly.
+
+Payload tells
+
+Mistral
+
+Model
+
+Question
+
+Temperature
+
+Max Tokens
+
+Why Messages?
+
+Notice
+
+messages
+
+Large Language Models
+
+don't receive
+
+plain text.
+
+They receive
+
+conversation.
+
+Example
+
+User
+
+↓
+
+Hello
+
+Assistant
+
+↓
+
+Hi
+
+User
+
+↓
+
+My network is slow.
+That's why the request uses a `messages` list with roles.
+
+---
+
+# Model
+
+Your project uses
+
+```text
+mistralai/ministral-3b-2512
+
+That means
+
+OpenRouter
+
+will send
+
+your prompt
+
+to
+
+that particular Mistral model.
+
+The file doesn't explain why this specific model was chosen; it simply selects it.
+
+Temperature
+
+This is one of the favourite interview questions.
+
+Imagine asking
+
+5 + 5
+
+Temperature
+
+0.0
+
+Always
+
+10
+
+Temperature
+
+1.0
+
+Maybe
+
+10
+
+Ten
+
+It equals ten.
+
+Five plus five is ten.
+
+Many variations.
+
+
+Your project
+
+uses
+
+0.2
+
+Why?
+
+Because
+
+telecom support
+
+needs
+
+consistent answers.
+
+Not creativity.
+
+Exactly why
+
+temperature
+
+is kept low.
+
+
+Max Tokens
+
+Question
+
+Can Mistral write
+
+100 pages?
+
+Yes.
+
+But you don't want that.
+
+So
+
+max_tokens
+
+↓
+
+256
+
+Means
+
+Stop
+
+after about
+
+256 generated tokens.
+
+Keeps responses concise.
+
+
+What happens after payload?
+
+Python sends
+
+Prompt
+
+↓
+
+Internet
+
+↓
+
+OpenRouter
+
+↓
+
+Mistral
+
+using an HTTP POST request.
+What does OpenRouter return?
+
+Something like
+
+{
+   choices:
+      [
+         message:
+              {
+                 content:
+                 "Your Answer"
+              }
+      ]
+}
+
+Your code extracts
+
+choices
+
+↓
+
+message
+
+↓
+
+content
+
+That is the actual reply shown to the user.
+
+Why 429?
+
+Suppose
+
+1000 people
+
+call OpenRouter
+
+at once.
+
+Server says
+
+Too Many Requests
+
+Status
+
+429
+
+Your code waits
+
+10 seconds
+
+and tries again.
+
+This is called
+
+Rate Limit Handling.
+
+Real-life analogy
+
+ATM
+
+↓
+
+Too many users.
+
+↓
+
+Please wait.
+
+↓
+
+Try again.
+
+Same idea.
+
+
+Exception Handling
+
+Suppose
+
+Internet gone.
+
+API down.
+
+Wrong key.
+
+Should chatbot crash?
+
+No.
+
+Return
+
+OpenRouter Error
+
+Gracefully.
+
+This makes the system more robust.
+
+
+Where does this file fit?
+User
+
+↓
+
+Tool Policy Classifier
+
+↓
+
+ToolExecutor
+
+↓
+
+SearchKB
+
+↓
+
+Retriever
+
+↓
+
+Reranker
+
+↓
+
+Network Tool
+
+↓
+
+Policy Tool
+
+↓
+
+Ticket Tool
+
+↓
+
+Collect Information
+
+↓
+
+hf_mistral_generator.py
+
+↓
+
+OpenRouter
+
+↓
+
+Mistral
+
+↓
+
+Natural Language Answer
+
+↓
+
+User
+
+Notice
+
+Everything before
+
+Mistral
+
+was collecting information.
+
+Everything after
+
+Mistral
+
+is simply displaying
+
+the final answer.
+
+inference_pipeline.py :
+Before this file
+
+You had many independent components.
+
+Knowledge Base
+
+Retriever
+
+FAISS
+
+Reranker
+
+Tool Policy
+
+Tool Executor
+
+Mistral
+
+Network Tool
+
+Ticket Tool
+
+Each worked independently.
+
+But who connects them?
+
+This file.
+
+Think of it as the CEO of the company.
+
+Company Analogy
+
+Imagine a telecom company.
+
+Departments:
+
+📚 Knowledge Team
+
+🛰 Network Team
+
+💳 Billing Team
+
+📞 Complaint Team
+
+🧠 AI Writer
+
+Who coordinates everyone?
+
+The CEO.
+
+Exactly.
+
+TelecomCopilot
+
+↓
+
+CEO
+
+The CEO never repairs towers.
+
+Never searches documents.
+
+Never writes policies.
+
+He simply tells every department what to do.
+
+That is exactly what TelecomCopilot does.
+
+Entire Flow
+
+This is the flow you should remember.
+
+                 User
+
+                   │
+
+                   ▼
+
+      TelecomCopilot.run()
+
+                   │
+
+                   ▼
+
+      Tool Policy Classifier (BERT)
+
+                   │
+
+      Decide required tools
+
+                   │
+
+                   ▼
+
+          Tool Execution
+
+                   │
+
+        ┌──────────┼──────────┐
+
+        ▼          ▼          ▼
+
+    SearchKB   Network    GetPolicy
+
+        │
+
+        ▼
+
+ Dense Retriever
+
+        │
+
+        ▼
+
+      FAISS
+
+        │
+
+        ▼
+
+     Top 20
+
+        │
+
+        ▼
+
+    Reranker
+
+        │
+
+        ▼
+
+     Best 5
+
+        │
+
+        ▼
+
+ Collect Every Result
+
+        │
+
+        ▼
+
+ Escalation Check
+
+        │
+
+        ▼
+
+ Build Final Prompt
+
+        │
+
+        ▼
+
+      Mistral
+
+        │
+
+        ▼
+
+ Parse Citations
+
+        │
+
+        ▼
+
+ Final Answer
+
+        │
+
+        ▼
+
+       User
+
+This is exactly what run() orchestrates.
+
+Step 0 — Loading Components
+
+When the application starts,
+
+TelecomCopilot()
+
+loads everything once:
+
+Tool Policy
+
+↓
+
+Tool Executor
+
+↓
+
+Retriever
+
+↓
+
+FAISS
+
+↓
+
+Reranker
+
+↓
+
+Generator
+
+Imagine opening a restaurant.
+
+Before customers arrive,
+
+you prepare:
+
+tables
+kitchen
+chefs
+menu
+
+Only then do you accept customers.
+
+Step 1 — User asks a question
+
+Example
+
+"My 5G isn't working in Ahmedabad."
+
+The query enters
+
+run()
+
+Everything starts from there.
+
+Step 2 — Tool Policy
+
+Question:
+
+Should we search?
+
+Check network?
+
+Create ticket?
+
+Read policy?
+
+BERT decides.
+
+Suppose it predicts
+
+SearchKB
+
++
+
+CheckNetworkStatus
+
+
+Step 3 — Tool Execution Loop
+
+Now ToolExecutor starts.
+
+Notice the loop.
+
+It doesn't know beforehand how many tools will run.
+
+Maybe
+
+SearchKB
+
+Only.
+
+Or
+
+SearchKB
+
+↓
+
+Network
+
+↓
+
+Policy
+
+Or
+
+SearchKB
+
+↓
+
+Ticket
+
+↓
+
+Policy
+
+↓
+
+Network
+
+The loop executes every required tool one after another.
+
+Step 4 — SearchKB
+
+ToolExecutor says
+
+SearchKB
+
+Internally
+
+Retriever
+
+↓
+
+FAISS
+
+↓
+
+Top20
+
+↓
+
+Reranker
+
+↓
+
+Top5
+
+The pipeline simply stores those passages.
+
+Step 5 — Network Tool
+
+If needed
+
+CheckNetworkStatus
+
+returns
+
+Ahmedabad
+
+↓
+
+Major Outage
+
+The pipeline stores that too.
+
+Step 6 — Policy Tool
+
+If SearchKB found
+
+Section 4.2
+
+then
+
+GetPolicy
+
+fetches the full section.
+
+Again,
+
+the pipeline stores it.
+
+
+Step 7 — Why collect everything?
+
+Notice something important.
+
+The pipeline doesn't immediately generate an answer after each tool.
+
+Instead it builds one collection of evidence.
+
+Retrieved Passages
+
++
+
+Network Status
+
++
+
+Policy
+
++
+
+Ticket
+
+↓
+
+One Context
+
+Only after all tools finish does it continue.
+
+This avoids incomplete answers.
+
+Step 8 — Escalation Check
+
+Now the pipeline asks:
+
+Is KB enough?
+
+If not,
+
+CreateTicket
+
+is called automatically.
+
+For example:
+
+Fraud
+
+↓
+
+Create Ticket
+
+or
+
+High-value billing dispute
+
+↓
+
+Create Ticket
+
+
+Step 9 — Build Context
+
+This is one of the most important ideas.
+
+Everything collected is merged into one prompt.
+
+Imagine a folder.
+
+Inside it:
+
+User Question
+
++
+
+Top KB Passages
+
++
+
+Network Status
+
++
+
+Policy
+
++
+
+Ticket Details
+
+This becomes the prompt for Mistral.
+
+Step 10 — Prompt
+
+The prompt also includes instructions like:
+
+Answer only from context.
+
+Never hallucinate.
+
+Always cite sources.
+
+These are guardrails that guide the LLM.
+
+Step 11 — Mistral
+
+Now the pipeline sends
+
+Complete Prompt
+
+↓
+
+OpenRouter
+
+↓
+
+Mistral
+
+Mistral returns
+
+Natural Language Answer
+Step 12 — Citation Parsing
+
+Mistral writes
+
+Recharge completed.
+
+[SOURCE: billing_doc, section_4]
+
+The pipeline separates
+
+Answer
+
+from
+
+Citation
+
+Now citations become structured data.
+
+
+Step 13 — Post Processing
+
+Suppose Mistral forgot to answer.
+
+Pipeline says
+
+Please provide more details.
+
+Suppose ticket created.
+
+Pipeline appends
+
+Ticket ID
+
+ETA
+
+Suppose fake citations exist.
+
+Pipeline removes them.
+
+Think of this as the final quality check before sending the answer to the customer
+
+
+Final Output
+
+Finally the pipeline returns something like
+
+Question
+
+↓
+
+Answer
+
+↓
+
+Citations
+
+↓
+
+Tool Trace
+
+↓
+
+Confidence
+
+↓
+
+Ticket ID
+
+↓
+
+Latency
+
+This structured output is useful for both the UI and evaluation.
+
+
+Exactly the same architecture:
+
+User
+
+↓
+
+Tool Policy (Receptionist)
+
+↓
+
+Tools (Departments)
+
+↓
+
+Evidence Collection
+
+↓
+
+Mistral (Senior Doctor)
+
+↓
+
+Final Answer
+
+↓
+
+User
+
+evaluator.py: 
+
+Why do we need evaluator.py?
+
+Imagine you built two chatbots.
+
+Chatbot A
+
+↓
+
+Answers questions.
+
+Chatbot B
+
+↓
+
+Also answers questions.
+
+Question:
+
+Which chatbot is better?
+
+You cannot simply say
+
+"I think Chatbot B is better."
+
+You need numbers.
+
+Exactly.
+
+This file gives numbers.
+
+
+Where does evaluator.py fit?
+Dataset
+     ↓
+Train Models
+     ↓
+Retriever
+     ↓
+Generator
+     ↓
+Inference Pipeline
+     ↓
+Generate Answers
+     ↓
+⭐ Evaluator
+     ↓
+Performance Report
+
+Notice
+
+Evaluation happens
+
+AFTER
+
+everything is finished.
+What is "Gold Answer"?
+
+Question
+
+How do we know
+
+our AI answered correctly?
+
+Because
+
+for every test case
+
+we already know
+
+the correct answer.
+
+Example
+
+Question
+
+How do I activate my SIM?
+
+Correct Answer
+
+Restart phone and wait 30 minutes.
+
+Your AI
+
+↓
+
+Writes
+
+Restart phone.
+
+Wait 30 minutes.
+
+Evaluator compares
+
+both.
+
+Why compare Baseline and Full System?
+
+Notice the comments.
+
+Your evaluator supports
+
+Baseline
+
+↓
+
+Week 1
+
+and
+
+Full System
+
+↓
+
+Week 5
+
+Both are evaluated on the same test cases so the comparison is fair.
+
+What is Citation Recall@1?
+
+One of the most important metrics.
+
+Question
+
+Did AI cite
+
+the correct document?
+
+Example
+
+Gold Document
+
+SIM_Activation_Guide
+
+AI cites
+
+SIM_Activation_Guide
+
+Perfect.
+
+Score
+
+1.0
+
+Wrong document
+
+↓
+
+0.0
+
+This measures grounding—whether the answer points to the correct source.
+
+
+Answer Coverage Score
+
+Question
+
+Did AI cover
+
+most important information?
+
+Example
+
+Correct Answer
+
+Restart phone.
+
+Wait 30 minutes.
+
+Ensure SIM inserted correctly.
+
+AI Answer
+
+Restart phone.
+
+Wait 30 minutes.
+
+It covered
+
+2 out of 3 important ideas.
+
+Coverage
+
+↓
+
+High.
+
+This is a simple content-overlap measure
+
+
+Grounded Escalation Accuracy (GEA)
+
+This is your novel metric.
+
+Question
+
+Should AI
+
+create ticket
+
+or not?
+
+Suppose
+
+Customer says
+
+Account hacked.
+
+Gold
+
+↓
+
+Escalate.
+
+AI
+
+↓
+
+Escalated.
+
+Correct.
+
+Score
+
+↓
+
+Suppose
+
+Gold
+
+↓
+
+Don't escalate.
+
+AI
+
+↓
+
+Creates ticket.
+
+Wrong.
+
+↓
+
+This metric checks whether escalation decisions match the expected behaviour.
+
+Outage-Aware Response Rate (OARR)
+
+Another
+
+Novel Metric.
+
+Question
+
+If
+
+network issue exists,
+
+did AI actually check
+
+Network Tool?
+
+Example
+
+User
+
+No signal.
+
+AI
+
+↓
+
+Used
+
+CheckNetworkStatus.
+
+Correct.
+
+↓
+
+If it answered
+
+without checking
+
+↓
+
+This measures whether outage-related questions triggered the appropriate tool.
+
+
+ROUGE-L
+
+Question
+
+How similar
+
+is AI answer
+
+to Gold Answer?
+
+Example
+
+Gold
+
+Restart phone.
+
+AI
+
+Please restart your phone.
+
+Almost same.
+
+High score.
+
+ROUGE-L focuses on similarity in sequence and phrasing.
+
+BERTScore
+
+ROUGE compares words.
+
+BERTScore compares meaning.
+
+Example
+
+Gold
+
+Restart your phone.
+
+AI
+
+Reboot your device.
+
+Different words.
+
+Same meaning.
+
+ROUGE
+
+↓
+
+Lower.
+
+BERTScore
+
+↓
+
+High.
+
+That is why both metrics are useful together
+
+
+Hallucination Rate
+
+Question
+
+Did AI invent
+
+information?
+
+Example
+
+Knowledge Base
+
+contains
+
+30 days warranty.
+
+AI says
+
+90 days warranty.
+
+Hallucination.
+
+Higher hallucination rate
+
+↓
+
+Bad.
+
+In your implementation, this is approximated using the presence or absence of citations.
+
+
+Latency
+
+Question
+
+How fast
+
+did AI answer?
+
+Example
+
+Question
+
+↓
+
+Answer
+
+↓
+
+800 ms
+
+Fast.
+
+Another
+
+↓
+
+5 seconds.
+
+Slow.
+
+This file reports both average latency and 95th percentile latency
+
+
+Per Domain Evaluation
+
+Instead of only saying
+
+Overall Accuracy
+
+it also asks
+
+How did AI perform
+
+on
+
+Billing
+
+SIM
+
+Network
+
+Policy
+
+Maybe
+
+Billing
+
+↓
+
+95%
+
+Network
+
+↓
+
+72%
+
+Now you know
+
+where to improve.
+
+Comparison Report
+
+Finally
+
+Evaluator prints
+
+Baseline
+
+↓
+
+Full System
+
+↓
+
+Difference
+
+Example
+
+Citation Recall
+
+0.62
+
+↓
+
+0.91
+
+Now you can prove
+
+your improvements
+
+with numbers.
+
+
+Complete Evaluation Flow
+Test Questions
+        │
+        ▼
+Inference Pipeline
+        │
+        ▼
+Predicted Answers
+        │
+        ▼
+Evaluator
+        │
+        ▼
+Compare with Gold Answers
+        │
+        ├── Citation Recall
+        ├── Answer Coverage
+        ├── GEA
+        ├── OARR
+        ├── ROUGE-L
+        ├── BERTScore
+        ├── Hallucination Rate
+        └── Latency
+        │
+        ▼
+Performance Report
+
+
+
+
+
+

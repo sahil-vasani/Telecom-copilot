@@ -362,12 +362,12 @@ class TelecomCopilot:
         citations = []
 
         for m in re.finditer(
-            r"\[SOURCE:\s*([^,\]]+),\s*([^\]]+)\]",
+            r"\[SOURCE:\s*([^,|\]]+)[,|]\s*(?:SECTION:\s*)?([^\]]+)\]",
             raw_output
         ):
             citations.append({
                 "doc_id": m.group(1).strip(),
-                "section_id": m.group(2).strip()
+                "section_id": m.group(2).strip().lstrip("section ").strip()
             })
 
         answer = re.sub(
@@ -544,7 +544,7 @@ if __name__ == "__main__":
             with open(out, "w") as f:
                 for r in results:
                     f.write(json.dumps(r, default=str) + "\n")
-            print(f"Saved {len(results)} results → {out}")
+            print(f"Saved {len(results)} results -> {out}")
 
             # Auto-compute metrics
             sys.path.insert(0, ".")
@@ -555,4 +555,4 @@ if __name__ == "__main__":
             mpath = Path("data/processed/full_system_results.eval.json")
             with open(mpath, "w") as f:
                 json.dump(metrics, f, indent=2, default=str)
-            print(f"Metrics saved → {mpath}")
+            print(f"Metrics saved -> {mpath}")

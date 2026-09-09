@@ -265,7 +265,7 @@ def train_tool_policy(
     # Final eval
     results = trainer.evaluate()
     print(f"\n  Final Val Accuracy: {results['eval_accuracy']:.4f}")
-    print(f"  Checkpoint saved → {output_dir}")
+    print(f"  Checkpoint saved -> {output_dir}")
 
     # Save label map
     with open(f"{output_dir}/label_map.json", "w") as f:

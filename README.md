@@ -1,15 +1,16 @@
 # 📡 TelecomRAG — Retrieval-Augmented Generation for Telecom Customer Support
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white" />
   <img src="https://img.shields.io/badge/PyTorch-2.x-EE4C2C?logo=pytorch&logoColor=white" />
   <img src="https://img.shields.io/badge/HuggingFace-Transformers-FFD21E?logo=huggingface&logoColor=black" />
   <img src="https://img.shields.io/badge/FAISS-Vector%20Search-00A86B" />
   <img src="https://img.shields.io/badge/PEFT-DoRA%20%7C%20LoRA-8A2BE2" />
+  <img src="https://img.shields.io/badge/Frontend-React%2019%20%7C%20Vite-61DAFB?logo=react&logoColor=black" />
   <img src="https://img.shields.io/badge/License-MIT-green" />
 </p>
 
-> A production-grade, end-to-end **RAG pipeline** for Indian telecom customer support. Combines fine-tuned dense retrieval, cross-encoder reranking, tool-augmented inference, and DoRA-tuned generation — grounded on real carrier data from **Jio, Airtel, Vi, BSNL, and TRAI**.
+> A production-grade, end-to-end **Tool-Augmented RAG System** designed for Indian telecom customer support. Combines fine-tuned dense retrieval, cross-encoder reranking, BERT-based tool policy routing, and DoRA / LLM generation — grounded on a massive 26,000+ passage corpus built from **Jio, Airtel, Vi, BSNL, TRAI guidelines**, and grounded dialogue datasets (**MultiDoc2Dial**).
 
 ---
 
@@ -19,61 +20,56 @@
 - [Live Demo Screenshots](#-live-demo-screenshots)
 - [System Architecture](#-system-architecture)
 - [Project Structure](#-project-structure)
-- [Components](#-components)
+- [Core Components](#-core-components)
 - [Dataset & Knowledge Base](#-dataset--knowledge-base)
-- [Training Pipeline](#-training-pipeline)
-- [Inference Pipeline](#-inference-pipeline-react-style)
-- [Tools](#-tools)
-- [Installation](#-installation)
-- [Usage](#-usage)
+- [Training & Ingestion Pipeline](#-training--ingestion-pipeline)
+- [Inference Pipeline (ReAct Control Loop)](#-inference-pipeline-react-control-loop)
+- [Evaluation Harness & Metrics](#-evaluation-harness--metrics)
+- [Installation & Setup Guide](#-installation--setup-guide)
+- [Usage Guide](#-usage-guide)
 - [Configuration](#-configuration)
-- [Results & Evaluation](#-results--evaluation)
 - [Design Decisions](#-design-decisions)
-- [Roadmap](#-roadmap)
+- [Roadmap & Acknowledgements](#-roadmap--acknowledgements)
 
 ---
 
 ## 🔍 Overview
 
-TelecomRAG is a **multi-component NLP system** that answers Indian telecom customer queries with cited, grounded responses. It is structured as a weekly research build:
+**TelecomRAG (Telecom Copilot)** addresses a critical challenge in conversational AI: general-purpose LLMs lack reliable, up-to-date knowledge on carrier-specific policies, recharge tariffs, network APN configurations, regulatory guidelines, and real-time network status.
 
-| Week | Focus | Key Components |
-|------|-------|----------------|
-| Week 1 | Knowledge Base + Data | Corpus builder, MD2D ingestion, data sources |
-| Week 2 | Retrieval + Reranking | Fine-tuned BGE retriever, cross-encoder reranker, FAISS index |
-| Week 3 | Generation + Tools | DoRA-tuned Flan-T5, tool executor, full ReAct pipeline |
-| Week 4 | Policy Classifier | BERT-based tool-policy classifier |
+This project delivers a multi-stage NLP & Agentic pipeline that standardizes telecom knowledge into structured vector spaces, routes user intents via specialized classifiers, executes external tools (including live outage inspection and ticket generation), and generates cited, grounded answers.
 
-**Baseline vs. Full System:**
+### Key Highlights
 
-| Feature | Baseline | TelecomRAG |
-|---------|----------|------------|
-| Retrieval | BM25 | Fine-tuned Dense + Reranker |
-| Generator | Un-tuned T5 | DoRA Flan-T5 |
-| Citations | ❌ | ✅ Structured `[SOURCE: doc_id, section_id]` |
-| Tool Calls | ❌ | ✅ SearchKB, GetPolicy, CreateTicket, CheckNetworkStatus |
-| Escalation | ❌ | ✅ Confidence-based escalation logic |
+- **26,104 Knowledge Passages**: Hybrid corpus comprising 24,933 grounded passages from MultiDoc2Dial and 1,171 telecom overlay passages spanning Jio, Airtel, Vi, BSNL, and TRAI regulatory frameworks.
+- **Fine-Tuned Retrieval & Reranking**: BGE-large retriever trained with Multiple Negatives Ranking Loss (MNRL) coupled with a Cross-Encoder (`ms-marco-MiniLM-L-6-v2`) reranker.
+- **BERT Tool Policy Classifier**: Fine-tuned BERT routing model that classifies incoming intent into specific tool executions (`SearchKB`, `GetPolicy`, `CreateTicket`, `CheckNetworkStatus`).
+- **Flexible Dual Generator Support**:
+  - **Local DoRA Flan-T5**: Parameter-Efficient Fine-Tuning using Weight-Decomposed Low-Rank Adaptation (DoRA rank 16, alpha 32).
+  - **Cloud OpenRouter LLM**: Production fallback integration supporting models like NVIDIA Nemotron 3 Super 120B with automated rate-limit retry handling.
+- **Novel Telecom Evaluation Metrics**: Custom evaluation harness computing **Citation Recall@1**, **Answer Coverage (ROUGE-1 proxy)**, **Grounded Escalation Accuracy (GEA)**, and **Outage-Aware Response Rate (OARR)**.
+- **Interactive React 19 Operations Dashboard**: SaaS control panel built with Vite, Tailwind CSS, Framer Motion, and Recharts to view live metrics, copilot chats, ticket queues, and network status feeds.
 
 ---
 
 ## 📸 Live Demo Screenshots
 
-Below are screenshots of the running live interface from the TelecomRAG Operations Dashboard:
+Below are screenshots of the operational web interface for Telecom Copilot:
 
-### 📊 Dashboard Page
-The main landing page displays system metrics, service tickets status (Open vs Escalated), active network status anomalies, and database statistics.
+### 📊 Dashboard Overview
+*Monitors system health, ticket distribution (Open vs. Escalated), active network anomalies, and knowledge base indexing stats.*
 ![Dashboard Page](docs/images/dashboard_demo.png)
 
-### 💬 Copilot Chat Screen
-The chat window handles query routing, active tool execution (e.g. dense retrieval + cross-encoder reranking), citations formatting, and ticket creation.
+### 💬 Copilot Chat Interface
+*Handles live query routing, tool execution traces (dense vector search, reranking, outage checks), citation rendering, and automated ticket generation.*
 ![Copilot Chat](docs/images/copilot_chat_demo.png)
 
 ### 🎫 Support Tickets View
-Track customer complaints and issues that have been confidence-escalated into structured tickets.
+*Tracks complaints confidence-escalated into structured customer support tickets with SLA tracking and queue management.*
 ![Support Tickets](docs/images/tickets_demo.png)
 
-### 🚨 Network status
-View active network anomalies and outage durations, enabling automated service credit calculations.
+### 🚨 Live Network Status Feed
+*Simulates real-time network anomaly feeds across Indian telecom circles, calculating compensation eligibility and outage durations.*
 ![Network Status](docs/images/network_status_demo.png)
 
 ---
@@ -81,50 +77,45 @@ View active network anomalies and outage durations, enabling automated service c
 ## 🏗 System Architecture
 
 ```
-User Query
-    │
-    ▼
-┌─────────────────────────────────────────────┐
-│           Tool Policy Classifier             │
-│   (fine-tuned BERT — Week 4)                │
-│   Decides: SearchKB / GetPolicy /            │
-│            CreateTicket / CheckNetworkStatus │
-└────────────────────┬────────────────────────┘
-                     │
-         ┌───────────▼────────────┐
-         │    Tool Execution Loop  │
-         │  ┌──────────────────┐  │
-         │  │   SearchKB       │  │
-         │  │  Dense Retriever │  │
-         │  │  (BGE fine-tuned)│  │
-         │  │       +          │  │
-         │  │  FAISS IndexFlat │  │
-         │  └────────┬─────────┘  │
-         │           │            │
-         │  ┌────────▼─────────┐  │
-         │  │   Cross-Encoder  │  │
-         │  │    Reranker      │  │
-         │  │  (MiniLM L-6)    │  │
-         │  └────────┬─────────┘  │
-         └───────────┼────────────┘
-                     │ Top-K Passages
-                     │
-         ┌───────────▼────────────┐
-         │   Escalation Check     │
-         │  (confidence threshold)│
-         └───────────┬────────────┘
-                     │
-         ┌───────────▼────────────┐
-         │     Generator          │
-         │  Flan-T5-base + DoRA   │
-         │  [CONTEXT + QUERY]     │
-         │        →               │
-         │  Cited Answer          │
-         └───────────┬────────────┘
-                     │
-                     ▼
-         Structured Response + Citations
-         [SOURCE: doc_id, section_id]
+                                 User Query
+                                     │
+                                     ▼
+                      ┌──────────────────────────────┐
+                      │    Tool Policy Classifier    │
+                      │  (fine-tuned BERT / Rules)   │
+                      └──────────────┬───────────────┘
+                                     │
+         ┌───────────────────────────┴───────────────────────────┐
+         │                                                       │
+         ▼                                                       ▼
+┌──────────────────┐                                   ┌──────────────────┐
+│ CheckNetworkStatus│ (Network outage queries)         │     SearchKB     │ (General domain queries)
+│  (Live Feed)     │                                   │  FAISS IndexFlat │
+└────────┬─────────┘                                   └────────┬─────────┘
+         │                                                       │ Top-20 Passages
+         │                                                       ▼
+         │                                             ┌──────────────────┐
+         │                                             │   Cross-Encoder  │
+         │                                             │     Reranker     │
+         │                                             └────────┬─────────┘
+         │                                                       │ Top-3 Passages
+         └───────────────────────────┬───────────────────────────┘
+                                     │
+                                     ▼
+                      ┌──────────────────────────────┐
+                      │    Confidence Escalation     │
+                      │  (Low score -> CreateTicket) │
+                      └──────────────┬───────────────┘
+                                     │
+                                     ▼
+                      ┌──────────────────────────────┐
+                      │    Generator (DoRA T5 /      │
+                      │    Nemotron 120B via API)    │
+                      └──────────────┬───────────────┘
+                                     │
+                                     ▼
+                      Structured Response + Citations
+                      [SOURCE: doc_id, section_id]
 ```
 
 ---
@@ -132,335 +123,244 @@ User Query
 ## 📁 Project Structure
 
 ```
-.
-├── src/
-│   ├── ingestion/
-│   │   ├── kb_builder.py                  # Builds the two-layer KB (MD2D + Telecom overlay)
-│   │   ├── telecom_corpus_builder.py      # 360+ telecom passages across 6 categories
-│   │   ├── telecom_corpus_builder_expanded.py
-│   │   ├── training_data_builder.py       # Merged MD2D + telecom training triples
-│   │   └── data_source/
-│   │       ├── airtel_data_ingestion.py   # Airtel FAQs and policy passages
-│   │       ├── bsnl_data_ingestion.py     # BSNL charter passages
-│   │       ├── jio_data_ingestion.py      # Jio FAQ data
-│   │       ├── vi_data_ingestion.py       # Vi (Vodafone Idea) data
-│   │       ├── TRAI_data_ingestion.py     # TRAI regulatory passages
-│   │       └── general_ingestion.py       # Generic telecom passages
-│   │
-│   ├── retrieval/
-│   │   ├── train_retriever.py             # Fine-tune BGE with MNRL loss
-│   │   ├── faiss_indexer.py               # Build FAISS IndexFlatIP
-│   │   └── reranker.py                    # Cross-encoder reranker fine-tuning
-│   │
-│   ├── generation/
-│   │   ├── train_generator.py             # DoRA fine-tuning on Flan-T5-base
-│   │   └── openrouter_generator.py        # OpenRouter external inference fallback
-│   │
-│   ├── tools/
-│   │   └── tool_executor.py               # SearchKB, GetPolicy, CreateTicket, CheckNetworkStatus
-│   │
-│   ├── policy/
-│   │   └── tool_policy_classifier.py      # Fine-tuned BERT tool-routing classifier
-│   │
-│   └── pipeline/
-│       └── inference_pipeline.py          # Full ReAct-style end-to-end pipeline
-│
+Telecom-copilot/
 ├── data/
 │   ├── raw/
-│   │   ├── telecom_kb/                    # Raw telecom knowledge base
-│   │   └── network_status.json            # Mock live network feed
+│   │   ├── telecom_kb/                   # Raw operator documents & policy text
+│   │   └── network_status.json           # Mock live network feed across regions
 │   └── processed/
-│       ├── kb_passages.jsonl              # All passages ready for FAISS
-│       ├── span_index.json                # span_id → passage lookup
-│       ├── doc_index.json                 # doc_id → title/domain lookup
-│       ├── retriever_train.jsonl          # Retriever training triples
-│       ├── generator_sft_train.jsonl      # Generator SFT pairs
-│       ├── dpo_pairs.jsonl                # Preference pairs (MD2D + SHP-2)
-│       └── tickets.jsonl                  # Created support tickets
+│       ├── dataset_stats.json            # Corpus passage, document & word counts
+│       ├── kb_passages.jsonl             # 26,104 structured passages for FAISS
+│       ├── span_index.json               # Fast span-level lookup table
+│       ├── doc_index.json                # Document metadata lookup table
+│       ├── retriever_train.jsonl         # Merged retrieval training triples
+│       ├── retriever_train_md2d.jsonl    # MultiDoc2Dial retrieval triples
+│       ├── retriever_train_telecom.jsonl # Telecom BM25-mined training triples
+│       ├── generator_sft_train.jsonl     # Supervised fine-tuning pair data
+│       ├── dpo_pairs.jsonl               # Preference pairs (MD2D + SHP-2)
+│       ├── test_cases.jsonl              # Test dataset for evaluation harness
+│       ├── tickets.jsonl                 # Logged customer escalation tickets
+│       ├── full_system_results.jsonl     # Inference outputs on test dataset
+│       └── full_system_results.eval.json # Evaluator metrics report
 │
-├── checkpoints/
-│   ├── retriever/                         # Fine-tuned BGE model
-│   ├── reranker/                          # Fine-tuned cross-encoder
-│   └── generator/                         # DoRA-tuned Flan-T5
+├── src/
+│   ├── ingestion/                        # Knowledge Base & Dataset Construction
+│   │   ├── kb_builder.py                 # MultiDoc2Dial + Telecom KB merger
+│   │   ├── telecom_corpus_builder.py     # Base telecom passage generator
+│   │   ├── telecom_corpus_builder_expanded.py # 1,100+ expanded telecom passages
+│   │   ├── training_data_builder.py      # Merged SFT, DPO & retriever dataset generator
+│   │   └── data_source/                  # Carrier-specific data scrapers/parsers
+│   │       ├── airtel_data_ingestion.py  # Airtel FAQs & policy passages
+│   │       ├── bsnl_data_ingestion.py    # BSNL citizen charter passages
+│   │       ├── jio_data_ingestion.py     # Jio FAQ data
+│   │       ├── vi_data_ingestion.py      # Vi (Vodafone Idea) data
+│   │       ├── TRAI_data_ingestion.py    # TRAI regulatory guidelines
+│   │       └── general_ingestion.py      # Generic telecom & APN setup guides
+│   │
+│   ├── retrieval/                        # Vector Search & Reranking
+│   │   ├── train_retriever.py            # BGE dense retriever fine-tuning (MNRL)
+│   │   ├── faiss_indexer.py              # FAISS IndexFlatIP vector index build
+│   │   └── reranker.py                   # Cross-Encoder fine-tuning & inference
+│   │
+│   ├── generation/                       # Response Generation
+│   │   ├── train_generator.py            # DoRA fine-tuning for Flan-T5
+│   │   └── openrouter_generator.py       # OpenRouter cloud generator (Nemotron 120B)
+│   │
+│   ├── policy/                           # Intent Routing
+│   │   └── tool_policy_classifier.py     # Fine-tuned BERT tool routing classifier
+│   │
+│   ├── tools/                            # System Tools
+│   │   └── tool_executor.py              # SearchKB, GetPolicy, CreateTicket, CheckNetworkStatus
+│   │
+│   ├── pipeline/                         # Execution Orchestration
+│   │   └── inference_pipeline.py         # Full ReAct-style end-to-end pipeline
+│   │
+│   └── evaluation/                       # Evaluation Suite
+│       └── evaluator.py                  # Multi-metric automated evaluation harness
 │
-├── .env                                   # API keys (never commit)
-├── requirements.txt
-└── README.md
+├── frontend/                             # React 19 Operations Dashboard
+│   ├── public/                           # Static assets & favicon
+│   ├── src/                              # React components, pages, & state
+│   ├── package.json                      # Node dependencies (Vite, Tailwind, Recharts)
+│   ├── tailwind.config.js                # Custom styling system
+│   └── vite.config.ts                    # Vite dev server configuration
+│
+├── checkpoints/                          # Saved Model Weights (gitignored)
+│   ├── retriever/                        # Fine-tuned BGE retriever weights
+│   ├── reranker/                         # Fine-tuned Cross-Encoder weights
+│   └── generator/                        # DoRA Flan-T5 adapter checkpoints
+│
+├── docs/                                 # Documentation & media assets
+│   └── images/                           # Dashboard & feature screenshots
+│
+├── telecom_explanation.txt               # In-depth architectural & data-flow whitepaper
+├── requirements.txt                      # Python dependencies
+├── .env                                  # API keys & environment variables
+└── README.md                             # Main documentation
 ```
 
 ---
 
-## 🧩 Components
+## 🧩 Core Components
 
-### A. Knowledge Base (`src/ingestion/`)
+### 1. Data Ingestion & Knowledge Base (`src/ingestion/`)
+- **MultiDoc2Dial Layer**: 24,933 passages across 488 documents grounding customer service interactions.
+- **Telecom Overlay Layer**: 1,171 passages across 10 documents representing Indian carriers (Jio, Airtel, Vi, BSNL) and TRAI regulations across 6 domain categories (`billing`, `plans`, `network`, `device`, `account`, `roaming`).
+- Output files: `kb_passages.jsonl` (26,104 vector index records), `span_index.json` (span-level lookup), and `doc_index.json` (document metadata).
 
-A **two-layer KB** design:
+### 2. Dense Retriever & Vector Indexing (`src/retrieval/`)
+- **Model**: `BAAI/bge-large-en-v1.5` fine-tuned with Multiple Negatives Ranking Loss (MNRL).
+- **Indexing**: FAISS `IndexFlatIP` over normalized 1024-d embeddings ensuring exact inner product cosine search across 26,000+ passages.
 
-- **Layer 1 — MultiDoc2Dial (MD2D):** 488 real government support documents across DMV, VA, SSA, and Student Aid domains. These are used as the primary retrieval training signal because MD2D dialogue turns are directly grounded in them.
-- **Layer 2 — Telecom Overlay:** 360+ handcrafted passages covering Jio, Airtel, Vi, BSNL, and TRAI regulations, segmented into 6 categories: `billing`, `plans`, `network`, `device`, `account`, `roaming`.
+### 3. Cross-Encoder Reranker (`src/retrieval/reranker.py`)
+- **Model**: `cross-encoder/ms-marco-MiniLM-L-6-v2`.
+- **Pipeline Role**: Reranks top-20 dense retrieval candidates down to the top-3 most contextual passages before handing them to the generator.
 
-**Outputs:**
-- `kb_passages.jsonl` — every passage ready for FAISS embedding
-- `span_index.json` — fast span-level lookup for `GetPolicy`
-- `doc_index.json` — document-level metadata
+### 4. Tool Policy Classifier (`src/policy/tool_policy_classifier.py`)
+- Fine-tuned BERT model (`bert-base-uncased`) that classifies user queries into tool routing actions:
+  - Label 0: `SearchKB`
+  - Label 1: `GetPolicy`
+  - Label 2: `CreateTicket`
+  - Label 3: `CheckNetworkStatus`
 
----
+### 5. Executable Tool Engine (`src/tools/tool_executor.py`)
+- `SearchKB`: Performs dense retrieval and cross-encoder reranking over the corpus.
+- `GetPolicy`: Rapid span-based document lookup for precise legal/regulatory clauses.
+- `CreateTicket`: Confidence-based customer complaint escalation logging to `tickets.jsonl`.
+- `CheckNetworkStatus`: Simulated live telecom network feed returning active outages and compensation eligibility.
 
-### B. Dense Retriever (`src/retrieval/train_retriever.py`)
-
-| Property | Value |
-|----------|-------|
-| Base Model | `BAAI/bge-large-en-v1.5` (335M params) |
-| Loss | `MultipleNegativesRankingLoss` (MNRL) |
-| Hard Negatives | In-batch + BM25-mined |
-| Evaluation | Recall@1, Recall@5, MRR@10 |
-| Training Time | ~25–35 min on T4 GPU |
-
-```bash
-python -m src.retrieval.train_retriever          # full training
-python -m src.retrieval.train_retriever --quick  # smoke test (2000 samples)
-python -m src.retrieval.train_retriever --eval   # evaluate saved model
-```
-
----
-
-### C. FAISS Indexer (`src/retrieval/faiss_indexer.py`)
-
-Builds an `IndexFlatIP` (exact cosine search) over all KB passages using the fine-tuned retriever embeddings.
-
-> **Why `IndexFlatIP`?** Exact search is sufficient for corpus sizes up to ~100K passages. For larger corpora, swap to `IndexIVFFlat` for approximate-but-faster search.
-
-```bash
-python -m src.retrieval.faiss_indexer
-python -m src.retrieval.faiss_indexer --model checkpoints/retriever   # fine-tuned
-python -m src.retrieval.faiss_indexer --model sentence-transformers/all-MiniLM-L6-v2  # base
-```
-
----
-
-### D. Cross-Encoder Reranker (`src/retrieval/reranker.py`)
-
-| Property | Value |
-|----------|-------|
-| Base Model | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
-| Task | Binary relevance classification |
-| Data | MD2D retriever triples (pos + 3 hard negs) |
-| Pipeline Role | Reranks top-20 dense candidates → selects top-3 for generator |
-
-```bash
-python -m src.retrieval.reranker --train
-python -m src.retrieval.reranker --eval
-python -m src.retrieval.reranker --demo "How do I dispute a billing error?"
-```
-
----
-
-### E. Generator — DoRA Fine-tuned Flan-T5 (`src/generation/train_generator.py`)
-
-| Property | Value |
-|----------|-------|
-| Base Model | `google/flan-t5-base` (250M params) |
-| PEFT Method | **DoRA** — Weight-Decomposed Low-Rank Adaptation ([Liu et al., ICML 2024](https://arxiv.org/abs/2402.09353)) |
-| Rank | 16, Alpha: 32 |
-| Task | Seq2Seq: `[CONTEXT + QUERY]` → `[CITED ANSWER]` |
-| Training Time | ~35 min on T4 GPU (8000 samples, 3 epochs) |
-
-**Why DoRA over LoRA?**  
-DoRA decomposes pre-trained weights into magnitude and direction vectors, giving finer control over adaptation. It consistently outperforms LoRA by **+0.5–2%** at the same rank with virtually zero extra parameters.
-
-**Prompt Template:**
-```
-<context>
-[Doc billing_002 | How to Raise a Dispute]
-To raise a billing dispute, use the self-service portal...
-</context>
-<history>
-User: My bill has a wrong charge.
-</history>
-<question>
-How do I dispute a charge on my bill?
-</question>
-Answer concisely and cite [SOURCE: doc_id, section_id]:
-```
-
-```bash
-python -m src.generation.train_generator           # full training
-python -m src.generation.train_generator --quick   # 500 samples, 1 epoch
-python -m src.generation.train_generator --compare # compare base vs fine-tuned
-```
-
----
-
-### F. Tool Policy Classifier (`src/policy/tool_policy_classifier.py`)
-
-Fine-tuned `bert-base-uncased` classifier that routes queries to the correct tool:
-
-| Label | Tool | Example Query |
-|-------|------|---------------|
-| 0 | `SearchKB` | "How do I dispute a charge?" |
-| 1 | `GetPolicy` | "What does section 4.2 say about roaming?" |
-| 2 | `CreateTicket` | "My internet is down — raise a complaint" |
-| 3 | `CheckNetworkStatus` | "Is there an outage in my area?" |
-
-Training data: ~400 labeled examples, balanced across all 4 classes.
-
----
-
-### G. Tool Executor (`src/tools/tool_executor.py`)
-
-Four production-wired tools:
-
-| Tool | Description |
-|------|-------------|
-| `SearchKB` | Dense retrieval + reranking over the KB. Always called first for grounding. |
-| `GetPolicy` | Direct span lookup in `span_index.json` for authoritative citations. |
-| `CreateTicket` | Writes to `tickets.jsonl`. Returns `ticket_id`, `eta_hours`, `queue`. |
-| `CheckNetworkStatus` | Reads `network_status.json` mock feed. Returns `status`, `active_incident`, `compensation_eligible`. |
+### 6. Dual Generator Engine (`src/generation/`)
+- **Local DoRA Flan-T5**: Parameter-efficient fine-tuning on `google/flan-t5-base` using Weight-Decomposed Low-Rank Adaptation (rank 16, alpha 32) to generate structured citations (`[SOURCE: doc_id, section_id]`).
+- **Cloud LLM (OpenRouter)**: High-capability inference engine utilizing NVIDIA Nemotron 3 Super 120B (`nvidia/nemotron-3-super-120b-a12b:free`) with automated exponential backoff retry.
 
 ---
 
 ## 📊 Dataset & Knowledge Base
 
-### Data Sources
+### Corpus Statistics (`data/processed/dataset_stats.json`)
 
-| Source | Type | Passages | Domain |
-|--------|------|----------|--------|
-| MultiDoc2Dial | Real policy documents | 488 docs | DMV, VA, SSA, Student Aid |
-| Jio FAQ | Operator FAQ | ~200+ | Plans, network, SIM, 5G |
-| Airtel FAQ | Operator FAQ | ~200+ | All categories |
-| Vi (Vodafone Idea) | Operator FAQ | ~150+ | Plans, support |
-| BSNL Charter | Citizen charter | ~100+ | Service commitments |
-| TRAI | Regulatory passages | ~100+ | Consumer rights, QoS |
-| General Telecom | Handcrafted | 360+ | 5G, SIM, portability, billing |
+| Metric | Count |
+|--------|-------|
+| **Total Passages** | **26,104** |
+| MultiDoc2Dial Passages | 24,933 |
+| Telecom Overlay Passages | 1,171 |
+| **Total Documents** | **498** |
+| MultiDoc2Dial Documents | 488 |
+| Telecom Overlay Documents | 10 |
+| **Total Words in Corpus** | **407,938** |
 
-### Training Data Files
+### Datasets Created During Pipeline Run
 
-| File | Purpose | Source |
-|------|---------|--------|
-| `retriever_train.jsonl` | `(query, positive, hard_neg)` triples | MD2D + telecom BM25 |
-| `generator_sft_train.jsonl` | `(context+query, cited_answer)` pairs | MD2D agent turns |
-| `dpo_pairs.jsonl` | Preference pairs for DPO | MD2D + SHP-2 |
-| `test_cases.jsonl` | Eval set | MD2D val + handcrafted |
+| File | Purpose | Source / Method |
+|------|---------|-----------------|
+| `retriever_train.jsonl` | Dense retriever training triples `(query, pos, neg)` | Merged MD2D + BM25-mined Telecom overlay |
+| `generator_sft_train.jsonl` | Generator SFT training pairs `(context+query, answer)` | Grounded MultiDoc2Dial agent dialogues |
+| `dpo_pairs.jsonl` | Direct Preference Optimization pairs | MultiDoc2Dial + Stanford Human Preferences (SHP-2) |
+| `test_cases.jsonl` | Comprehensive evaluation set | Validation split + Telecom evaluation queries |
 
 ---
 
-## 🔁 Training Pipeline
+## 🔁 Training & Ingestion Pipeline
 
-Run each stage in order:
+To run the complete data processing and training pipeline from scratch:
 
 ```bash
-# 1. Build Knowledge Base
+# 1. Build Telecom Corpus & Expand Passages
+python -m src.ingestion.telecom_corpus_builder_expanded
+
+# 2. Build Unified Knowledge Base
 python -m src.ingestion.kb_builder
 
-# 2. Build Training Data
+# 3. Construct Training Datasets (Retriever, Generator SFT, DPO)
 python -m src.ingestion.training_data_builder
 
-# 3. Build Telecom Corpus
-python -m src.ingestion.telecom_corpus_builder
-
-# 4. Fine-tune Dense Retriever
+# 4. Fine-Tune Dense Retriever (BGE-Large)
 python -m src.retrieval.train_retriever
 
-# 5. Build FAISS Index
+# 5. Build FAISS Vector Index
 python -m src.retrieval.faiss_indexer --model checkpoints/retriever
 
-# 6. Fine-tune Cross-Encoder Reranker
+# 6. Fine-Tune Cross-Encoder Reranker
 python -m src.retrieval.reranker --train
 
-# 7. Fine-tune Generator (DoRA)
+# 7. Fine-Tune DoRA Generator (Flan-T5)
 python -m src.generation.train_generator
 
-# 8. (Optional) Train Tool Policy Classifier
-#    see src/policy/tool_policy_classifier.py
+# 8. Train Tool Policy Classifier
+python -m src.policy.tool_policy_classifier --train
 ```
 
 ---
 
-## 🤖 Inference Pipeline (ReAct-Style)
+## 🤖 Inference Pipeline (ReAct Control Loop)
 
-`src/pipeline/inference_pipeline.py` connects all trained components in a **ReAct-inspired** control loop:
+The inference pipeline (`src/pipeline/inference_pipeline.py`) executes a multi-step control loop:
 
-```
-1. Tool Policy  →  classify query → which tools to call
-2. Tool Loop    →  call tools, collect evidence
-3. Escalation   →  decide if KB is sufficient or ticket needed
-4. Generator    →  produce cited answer from <context>
-5. Post-process →  parse citations, format response
-```
+1. **Intent Classification**: Query is sent to the Tool Policy Classifier to decide required tool calls.
+2. **Tool Execution Loop**: Runs `SearchKB`, `CheckNetworkStatus`, or `GetPolicy` to gather evidence.
+3. **Escalation Assessment**: If retrieval confidence falls below threshold, automatically triggers `CreateTicket`.
+4. **Context Prompting & Generation**: Assembles context and query into structured prompt template and invokes the generator.
+5. **Citation Post-Processing**: Extracts source tags `[SOURCE: doc_id, section_id]` and formats final answer payload.
 
+---
+
+## 📐 Evaluation Harness & Metrics
+
+Evaluation is performed using `src/evaluation/evaluator.py`, comparing outputs on `test_cases.jsonl`.
+
+### Metric Definitions
+
+1. **Citation Recall@1**: Validates whether the gold target document ID is present in the output citation list.
+2. **Answer Coverage Score**: Measures token-level ROUGE-1 recall of key content words against reference gold answers.
+3. **Grounded Escalation Accuracy (GEA)**: Custom metric measuring correct ticket escalation decisions on ambiguous or ungrounded queries.
+4. **Outage-Aware Response Rate (OARR)**: Custom metric verifying that active network outages trigger proactive status notices and compensation info.
+
+### System Benchmark Summary (`full_system_results.eval.json`)
+
+| Evaluation Metric | Full System Score |
+|-------------------|-------------------|
+| **Grounded Escalation Accuracy (GEA)** | **91.71%** |
+| **Outage-Aware Response Rate (OARR)** | **100.0%** |
+| **BERTScore F1** | **0.8107** |
+| **Evaluated Test Queries** | 205 cases |
+
+To re-run evaluation:
 ```bash
-# Interactive demo
-python -m src.pipeline.inference_pipeline --demo
-
-# Full evaluation on test set
-python -m src.pipeline.inference_pipeline --eval
-```
-
-**Example Response:**
-```
-Query: "How do I dispute a wrong charge on my Airtel bill?"
-
-Answer: You can raise a billing dispute through the Airtel Thanks app under 
-"Bill & Payments > Raise a Complaint", or by calling 121. 
-[SOURCE: airtel_billing_003, airtel_billing_003_s2]
-
-Tools used: SearchKB (category=billing), GetPolicy
-Escalation: Not required (confidence: 0.87)
+python -m src.evaluation.evaluator --results data/processed/full_system_results.jsonl
 ```
 
 ---
 
-## 🛠 Tools
-
-### CheckNetworkStatus *(Novel Tool)*
-
-Unlike standard RAG tools, `CheckNetworkStatus` simulates a **live network feed** — not just KB lookup:
-
-```python
-result = check_network_status(region="Mumbai", service_type="5G")
-# → {"status": "degraded", "active_incident": True, "compensation_eligible": True}
-```
-
-This enables the system to detect outages and proactively inform customers about compensation eligibility — a capability not present in any baseline RAG system.
-
----
-
-## ⚙️ Installation & Running instructions
+## ⚙️ Installation & Setup Guide
 
 ### Prerequisites
+- Python 3.10+ (Python 3.11 recommended)
+- Node.js 18+ & npm 9+
+- CUDA GPU (Optional; CPU execution supported)
+- [OpenRouter API key](https://openrouter.ai) (for cloud generator fallback)
 
-* Python 3.10+
-* Node.js v18+ & npm v9+ (for the operations dashboard)
-* CUDA GPU (Optional, CPU execution supported for the pipeline)
-* [OpenRouter API key](https://openrouter.ai) (for generator API calls)
+### Step 1: Clone Repository & Python Virtual Environment
 
----
-
-### Step 1: Base Setup & Backend Installation
-
-First, clone the repository, set up a virtual environment, and install dependencies:
-
-```powershell
-# 1. Clone & Enter project
+```bash
 git clone https://github.com/sahil-vasani/Telecom-copilot.git
 cd Telecom-copilot
 
-# 2. Create and activate a Virtual Environment
+# Create virtual environment
 python -m venv .venv
-# On Windows (PowerShell):
+
+# Activate environment (Windows PowerShell)
 .venv\Scripts\activate
-# On Linux / macOS:
+
+# Activate environment (Linux/macOS)
 source .venv/bin/activate
 
-# 3. Install requirements
+# Install requirements
 pip install -r requirements.txt
 ```
 
----
-
 ### Step 2: Configure Environment Variables
 
-Create a `.env` file in the project root containing your API configurations:
+Create a `.env` file in the root directory:
 
 ```env
 OPENROUTER_API_KEY=your_openrouter_api_key_here
@@ -468,181 +368,90 @@ OPENROUTER_API=https://openrouter.ai/api/v1/chat/completions
 HF_HOME=./huggingface_cache
 ```
 
----
-
-### Step 3: Run the Training Pipeline
-
-If you want to train RAG components from scratch, run each phase sequentially:
+### Step 3: Frontend Dashboard Setup
 
 ```bash
-# 1. Build local Knowledge Base files
-python -m src.ingestion.kb_builder
-
-# 2. Build training dataset triples
-python -m src.ingestion.training_data_builder
-
-# 3. Build the Telecom Overlay corpus
-python -m src.ingestion.telecom_corpus_builder
-
-# 4. Fine-tune BGE Dense Retriever
-python -m src.retrieval.train_retriever
-
-# 5. Index the passages using FAISS
-python -m src.retrieval.faiss_indexer --model checkpoints/retriever
-
-# 6. Fine-tune Cross-Encoder Reranker
-# (Windows user console encoding warning: prepend $env:PYTHONUTF8="1" in PowerShell)
-python -m src.retrieval.reranker --train --max-samples 1000 --epochs 1
-```
-
----
-
-### Step 4: Launch the React Operations Dashboard
-
-The project features a premium SaaS dashboard to query the copilot agent and inspect RAG states:
-
-```bash
-# 1. Enter the frontend directory
 cd frontend
-
-# 2. Install node packages
 npm install
-
-# 3. Start the development server
-npm run dev
+cd ..
 ```
-Open `http://localhost:5173/` in your browser to view the interactive application.
 
 ---
 
-## 🚀 Usage (Python Backend CLI)
+## 🚀 Usage Guide
 
-### Quick Demo
-
-To run the pipeline directly in the terminal:
+### 1. Interactive Python CLI Demo
+Run an interactive session in your terminal:
 ```bash
 python -m src.pipeline.inference_pipeline --demo
 ```
 
-### Single Query (Python)
-
+### 2. Python API Usage
 ```python
 from src.pipeline.inference_pipeline import run_inference
 
 response = run_inference(
-    query="What is the process to port my Jio number to Airtel?",
+    query="How do I dispute an incorrect charge on my Airtel bill?",
     history=[]
 )
-print(response["answer"])
-print(response["citations"])
+
+print("Answer:", response["answer"])
+print("Citations:", response["citations"])
+print("Tools Called:", response["tools_called"])
 ```
 
-### Evaluate on Test Set
-
+### 3. Launching the React Operations Dashboard
+Start the Vite development server for the web interface:
 ```bash
-python -m src.pipeline.inference_pipeline --eval
+cd frontend
+npm run dev
 ```
-
-### Generate OpenRouter Response (Fallback)
-
-```python
-from src.generation.openrouter_generator import generate_openrouter_response
-
-answer = generate_openrouter_response("Explain Airtel's 5G rollout in India.")
-print(answer)
-```
+Open `http://localhost:5173/` in your browser.
 
 ---
 
 ## 🔧 Configuration
 
-Key hyperparameters are documented inline in each module's docstring. The most important ones:
+Key system parameters can be configured in their respective module files:
 
-| Parameter | Default | Location |
-|-----------|---------|----------|
-| Retriever base model | `BAAI/bge-large-en-v1.5` | `train_retriever.py` |
-| Retriever batch size | 32 | `train_retriever.py` |
-| Reranker neg per pos | 3 | `reranker.py` |
-| Generator rank (DoRA) | 16 | `train_generator.py` |
-| Generator alpha | 32 | `train_generator.py` |
-| FAISS top-K retrieve | 20 | `faiss_indexer.py` |
-| Reranker top-K output | 3 | `reranker.py` |
-| OpenRouter max tokens | 1024 | `openrouter_generator.py` |
-| OpenRouter temperature | 0.2 | `openrouter_generator.py` |
-
----
-
-## 📈 Results & Evaluation
-
-### Retrieval Metrics (on MD2D validation set)
-
-| Model | Recall@1 | Recall@5 | MRR@10 |
-|-------|----------|----------|--------|
-| BM25 (baseline) | — | — | — |
-| BGE base (zero-shot) | — | — | — |
-| BGE fine-tuned | ✅ | ✅ | ✅ |
-| + Reranker | ✅✅ | ✅✅ | ✅✅ |
-
-*(Run `python -m src.retrieval.train_retriever --eval` to populate actual numbers)*
-
-### Generation Quality
-
-| Model | Citation Accuracy | Answer Relevance |
-|-------|-----------------|-----------------|
-| Flan-T5 base | — | — |
-| + DoRA fine-tuned | ✅ | ✅ |
-
-*(Run `python -m src.generation.train_generator --compare` to compare)*
+| Parameter | Default Value | Location |
+|-----------|---------------|----------|
+| Retriever Base Model | `BAAI/bge-large-en-v1.5` | `train_retriever.py` |
+| Vector Index Type | `IndexFlatIP` (Cosine) | `faiss_indexer.py` |
+| Reranker Model | `cross-encoder/ms-marco-MiniLM-L-6-v2` | `reranker.py` |
+| Generator Model (Local) | `google/flan-t5-base` | `train_generator.py` |
+| Generator Rank / Alpha (DoRA) | Rank 16, Alpha 32 | `train_generator.py` |
+| Cloud Generator Model | `nvidia/nemotron-3-super-120b-a12b:free` | `openrouter_generator.py` |
+| FAISS Top-K Retrieve | 20 candidates | `inference_pipeline.py` |
+| Reranker Top-K Output | 3 candidates | `inference_pipeline.py` |
 
 ---
 
 ## 🧠 Design Decisions
 
-### Why Flan-T5-base for generation?
-- Instruction-tuned at pre-training — already follows format prompts cleanly
-- 250M params fit a T4 16GB GPU with no quantization
-- Seq2Seq architecture is cleaner for structured citation output than decoder-only models
-
-### Why DoRA over LoRA?
-- DoRA decomposes weights into magnitude + direction (Liu et al., ICML 2024)
-- Consistently +0.5–2% over LoRA at identical rank/alpha
-- Adds virtually zero extra parameters
-- Gives better citation precision for structured output tasks
-
-### Why IndexFlatIP?
-- Corpus size (~3K–15K passages after MD2D) does not require approximation
-- Inner product on unit-normalized vectors = cosine similarity
-- Upgrade path: switch to `IndexIVFFlat` if corpus exceeds 100K passages
-
-### Why MD2D as training signal?
-- MD2D dialogue turns are directly grounded in the 488 documents
-- This alignment means the retriever's training signal (query → correct span) is truthful
-- Telecom overlay documents add domain flavor for demo/serving without polluting training
+- **Why DoRA over standard LoRA?**: Weight-Decomposed Low-Rank Adaptation (DoRA) decouples magnitude and direction of weight updates, outperforming LoRA by +0.5–2.0% at identical ranks on structured text output tasks.
+- **Why FAISS `IndexFlatIP`?**: Vector normalization combined with Inner Product (`IP`) yields exact cosine similarity search. Given the 26,000+ passage corpus size, exact search executes in milliseconds without requiring lossy quantization (`IVFFlat` or `HNSW`).
+- **Why MultiDoc2Dial as Grounding Base?**: MultiDoc2Dial provides thousands of turn-by-turn dialogue interactions paired with explicit document span groundings, giving the dense retriever and cross-encoder a high-quality supervision signal.
+- **Why Novel Metrics (GEA & OARR)?**: Standard NLP metrics (BLEU/ROUGE) fail to capture domain-specific telecom requirements such as knowing when to escalate unanswerable queries to human agents or detecting active regional outages.
 
 ---
 
-## 🗺 Roadmap
+## 🗺 Roadmap & Acknowledgements
 
-- [ ] DPO fine-tuning on `dpo_pairs.jsonl` for preference alignment
-- [ ] Swap `IndexFlatIP` → `IndexIVFFlat` for large-scale deployment
-- [ ] Streamlit / FastAPI serving layer
-- [ ] Expand to BSNL and TRAI regulatory Q&A
-- [ ] Multilingual support (Hindi, Gujarati, Tamil)
-- [ ] A/B eval: DoRA vs. full fine-tune vs. base
+### Roadmap
+- [ ] Implement DPO fine-tuning using `dpo_pairs.jsonl` for preference optimization.
+- [ ] Add FastAPI server endpoints to connect React frontend directly to Python backend pipeline.
+- [ ] Support multilingual queries across major Indian languages (Hindi, Tamil, Telugu, Marathi).
+- [ ] Expand FAISS index to `IndexIVFFlat` for large-scale enterprise deployments (>1M passages).
 
----
-
-## 🙏 Acknowledgements
-
-- [MultiDoc2Dial](https://github.com/IBM/multidoc2dial) — real grounded dialogue dataset
-- [BAAI/bge-large-en-v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5) — retriever base model
-- [DoRA — Liu et al., ICML 2024](https://arxiv.org/abs/2402.09353) — PEFT method
-- [sentence-transformers](https://www.sbert.net/) — retrieval training framework
-- [FAISS](https://github.com/facebookresearch/faiss) — vector search
-- [OpenRouter](https://openrouter.ai) — External inference API
+### Acknowledgements
+- [MultiDoc2Dial](https://github.com/IBM/multidoc2dial) for document-grounded dialogue data.
+- [BAAI BGE Models](https://huggingface.co/BAAI/bge-large-en-v1.5) for text embeddings.
+- [DoRA Paper (Liu et al., ICML 2024)](https://arxiv.org/abs/2402.09353) for PEFT methodology.
+- [HuggingFace Transformers](https://huggingface.co/) & [FAISS](https://github.com/facebookresearch/faiss).
 
 ---
 
 <p align="center">
-  Built with ❤️ for Indian telecom customers · Powered by open-source NLP
+  Built with ❤️ for Indian Telecom Customers · Powered by Open-Source NLP & Agentic AI
 </p>

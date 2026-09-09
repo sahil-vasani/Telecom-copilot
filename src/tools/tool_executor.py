@@ -559,7 +559,7 @@ def seed_network_status_feed(output_path: str = "data/raw/network_status.json"):
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w") as f:
         json.dump(feed, f, indent=2)
-    print(f"  Network status feed seeded → {output_path}")
+    print(f"  Network status feed seeded -> {output_path}")
     return feed
 
 

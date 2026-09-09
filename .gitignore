@@ -1,31 +1,50 @@
-# Python
-__pycache__/
-*.pyc
-
-# Data
-data/raw/ 
-
-# Models
-checkpoints/
-
-# FAISS indexes
-data/index/*.index
-
-# Models
-checkpoints/
-*.pt
-*.bin
-*.safetensors
-
-# Jupyter
-.ipynb_checkpoints/
-
-# HuggingFace
-cache/
-huggingface/
-
+# Environment & Virtualenvs
 .env
 .env.*
 .venv/
+venv/
+ENV/
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Large Datasets & Generated Data Files
+data/raw/
+data/data/
+data/index/
+data/processed/*.jsonl
+data/processed/span_index.json
+data/processed/doc_index.json
+
+# Model Checkpoints & Binary Weights
+checkpoints/
+*.pt
+*.bin
+*.pth
+*.safetensors
+*.index
+*.onnx
+*.engine
+
+# HuggingFace & Model Caches
+cache/
+huggingface/
+huggingface_cache/
+
+# Node / Frontend
 node_modules/
+frontend/node_modules/
 dist/
+frontend/dist/
+.eslintcache
+
+# Logs & System
+*.log
+.DS_Store
+Thumbs.db
+.ipynb_checkpoints/
