@@ -26,12 +26,12 @@ Run:
 """
 from src.policy.tool_policy_classifier import TrainedToolPolicy
 import os
+import torch
 
 os.environ["HF_HOME"] = "D:/huggingface"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 import json
 import time
-from src.generation.openrouter_generator import generate_openrouter_response
 import re
 import argparse
 from pathlib import Path
@@ -166,19 +166,40 @@ class TelecomCopilot:
             span_index_path = span_index_path,
         )
 
-        # Generator (DoRA fine-tuned)
-        # self.generator = None
-        # try:
-        #     self.generator = None
-        #     print("  [Pipeline] Using OpenRouter API generator.")
-        #     print("  [Pipeline] DoRA generator loaded.")
-        # except Exception as e:
-        #     print(f"  [Pipeline] Generator unavailable ({e}). Using API fallback.")
-
-        # Use OpenRouter API only
+        # Generator (DoRA fine-tuned Flan-T5 as FINAL GENERATOR)
         self.generator = None
+        self.tokenizer = None
+        self.generator_device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        print("  [Pipeline] Using OpenRouter API generator.")
+        try:
+            from transformers import T5Tokenizer, T5ForConditionalGeneration
+            from peft import PeftModel
+
+            gen_p = Path(generator_path)
+            # 1. Try direct load if merged model exists at generator_path
+            if (gen_p / "model.safetensors").exists() or (gen_p / "pytorch_model.bin").exists():
+                print(f"  [Pipeline] Loading fine-tuned Flan-T5 merged model from {generator_path}...")
+                self.tokenizer = T5Tokenizer.from_pretrained(generator_path)
+                self.generator = T5ForConditionalGeneration.from_pretrained(generator_path)
+            # 2. Or load base model + adapter from checkpoint subdirectory
+            elif (gen_p / "checkpoint-57" / "adapter_model.safetensors").exists():
+                adapter_dir = str(gen_p / "checkpoint-57")
+                print(f"  [Pipeline] Loading base model and DoRA adapter from {adapter_dir}...")
+                self.tokenizer = T5Tokenizer.from_pretrained(adapter_dir)
+                base_model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-small")
+                self.generator = PeftModel.from_pretrained(base_model, adapter_dir)
+            else:
+                # Fallback to loading whatever is at generator_path
+                self.tokenizer = T5Tokenizer.from_pretrained(generator_path)
+                self.generator = T5ForConditionalGeneration.from_pretrained(generator_path)
+
+            self.generator.to(self.generator_device)
+            self.generator.eval()
+            print(f"  [Pipeline] Fine-tuned DoRA Flan-T5 generator loaded on {self.generator_device}.")
+        except Exception as e:
+            print(f"  [Pipeline] Error loading fine-tuned generator ({e}).")
+            self.generator = None
+
         print("="*55 + "\n")
 
     def _api_generate(self, prompt: str) -> str:
@@ -334,33 +355,54 @@ class TelecomCopilot:
             f"{p.get('text', '')}"
             for p in gen_context
         ])
-        # ── Step 5: Generate answer ────────────────────────────────
-        prompt = f"""
-            You are a telecom customer-support AI assistant.
+        # ── Step 5: Generate answer using fine-tuned DoRA Flan-T5 ──
+        # Build prompt matching the generator training format (build_input_prompt)
+        # We ensure passage labels do not duplicate question phrasing to prevent trivial echoing
+        ctx_formatted = []
+        for p in gen_context[:3]:
+            doc_id = p.get("doc_id", "?")
+            ctx_formatted.append({
+                "doc_id": doc_id,
+                "heading": "",  # omit heading to avoid model echoing heading instead of text
+                "text": p.get("text", "")
+            })
+        prompt = build_input_prompt(query, ctx_formatted, history=history)
 
-            STRICT RULES:
-            1. Answer ONLY using the provided context.
-            2. NEVER use outside knowledge.
-            3. If answer is not in context, say:
-            "I could not find this information in the telecom knowledge base."
-            4. ALWAYS cite sources in this format:
-            [SOURCE: doc_id, section_id]
-            5. Keep answer concise and factual.
-            6. Do NOT invent policies, taxes, fees, or rules.
+        raw_output = ""
+        if self.generator is not None and self.tokenizer is not None:
+            try:
+                inputs = self.tokenizer(
+                    prompt,
+                    return_tensors="pt",
+                    max_length=256,
+                    truncation=True
+                ).to(self.generator_device)
+                with torch.no_grad():
+                    gen_tokens = self.generator.generate(
+                        **inputs,
+                        max_new_tokens=64,
+                        num_beams=4,
+                        no_repeat_ngram_size=3,
+                        min_length=15,
+                        early_stopping=True,
+                    )
+                raw_output = self.tokenizer.decode(gen_tokens[0], skip_special_tokens=True).strip()
+            except Exception as gen_err:
+                print(f"[Generator] Execution error: {gen_err}")
+                raw_output = ""
 
-            CONTEXT:
-            {context_text}
+        # Extract answer text, stripping leading [Doc ...] tags and inline [SOURCE: ...]
+        answer = re.sub(r"^\s*\[Doc\s+[^\]]*\]\s*", "", raw_output).strip()
+        answer = re.sub(r"\[SOURCE:[^\]]+\]", "", answer).strip()
 
-            QUESTION:
-            {query}
-
-            ANSWER:
-            """
-
-        raw_output = generate_openrouter_response(prompt)
+        # If answer is empty or too short, fallback to most relevant retrieved text
+        if (not answer or len(answer) < 5) and gen_context:
+            fallback_text = gen_context[0].get("text", "").strip()
+            answer = fallback_text[:200]
 
         citations = []
 
+        # 1. Parse any explicit [SOURCE: doc_id, section_id] produced in generation
         for m in re.finditer(
             r"\[SOURCE:\s*([^,|\]]+)[,|]\s*(?:SECTION:\s*)?([^\]]+)\]",
             raw_output
@@ -370,11 +412,17 @@ class TelecomCopilot:
                 "section_id": m.group(2).strip().lstrip("section ").strip()
             })
 
-        answer = re.sub(
-            r"\[SOURCE:[^\]]+\]",
-            "",
-            raw_output
-        ).strip()
+        # 2. Ground citations from top retrieved/tool context
+        if not citations and gen_context:
+            for p in gen_context[:2]:
+                doc_id = p.get("doc_id")
+                sec_id = p.get("section_id", p.get("span_id", "s1"))
+                if doc_id and doc_id != "unknown":
+                    citations.append({
+                        "doc_id": doc_id,
+                        "section_id": sec_id,
+                        "text": p.get("text", "")[:250],
+                    })
 
         # ── Step 6: Augment answer with ticket / outage info ───────
         if escalated and ticket_id:
@@ -385,18 +433,6 @@ class TelecomCopilot:
             if ticket_note.strip() not in answer:
                 answer = answer + ticket_note
 
-        if escalated and ticket_id:
-            ticket_note = (
-                f" Your issue has been escalated — ticket {ticket_id} created. "
-                f"Our team will contact you within the specified time."
-            )
-            if ticket_note.strip() not in answer:
-                answer = answer + ticket_note
-
-
-        # =========================
-        # ADD THIS NEW BLOCK HERE
-        # =========================
         if not answer or len(answer.strip()) < 5:
             answer = (
                 "Please provide more details about your issue. "
@@ -404,11 +440,15 @@ class TelecomCopilot:
                 "and describe the problem."
             )
 
-        # REMOVE FAKE DOC_ID CITATIONS
+        # Remove duplicate or placeholder doc_id citations
+        seen_cites = set()
         clean_citations = []
         for c in citations:
             if isinstance(c, dict):
-                if c.get("doc_id") != "doc_id":
+                c_doc = c.get("doc_id", "")
+                c_sec = c.get("section_id", "")
+                if c_doc and c_doc != "doc_id" and (c_doc, c_sec) not in seen_cites:
+                    seen_cites.add((c_doc, c_sec))
                     clean_citations.append(c)
 
         citations = clean_citations

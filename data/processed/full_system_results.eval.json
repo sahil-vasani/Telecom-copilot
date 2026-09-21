@@ -1,5 +1,5 @@
 {
-  "label": "full_system",
+  "label": "system",
   "n": 205,
   "citation_recall_at_1": 0.1195,
   "answer_coverage_score": 0.0773,

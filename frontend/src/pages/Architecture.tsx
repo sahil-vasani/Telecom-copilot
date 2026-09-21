@@ -89,13 +89,13 @@ const NODES: ArchNode[] = [
     id: 'generator',
     name: 'Grounded Generator',
     icon: Award,
-    modelType: 'DoRA Fine-Tuned Flan-T5-base / OpenRouter API',
-    description: 'Drafts the final response by strictly grounding the answer in the retrieved facts and formatting citations.',
+    modelType: 'Fine-Tuned Flan-T5 (DoRA / PEFT)',
+    description: 'Generates the final response by directly grounding the answer in the retrieved facts and formatting citations.',
     input: 'Top-3 Reranked contexts + Tool outputs + Query',
-    output: 'Structured grounded response + citation nodes',
+    output: 'Direct final answer + source citations',
     details: [
       'Fine-tuned using Weight-Decomposed Low-Rank Adaptation (DoRA)',
-      'Adheres to strict prompts to prevent hallucinations',
+      'Functions as the direct, final generator without chaining to another LLM',
       'Formats source tracking tags like [SOURCE: doc_id, section_id]'
     ]
   }

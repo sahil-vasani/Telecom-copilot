@@ -276,11 +276,27 @@ export async function sendChatMessage(query: string, history: any[]): Promise<Ch
 }
 
 export async function getNetworkStatus(): Promise<NetworkStatus[]> {
+  try {
+    const response = await apiClient.get<NetworkStatus[]>('/network-status');
+    if (Array.isArray(response.data) && response.data.length > 0) {
+      return response.data;
+    }
+  } catch (error) {
+    // fallback to mock status below
+  }
   await sleep(400); // Simulate API latency
   return [...MOCK_NETWORK_STATUS];
 }
 
 export async function getTickets(): Promise<Ticket[]> {
+  try {
+    const response = await apiClient.get<Ticket[]>('/tickets');
+    if (Array.isArray(response.data) && response.data.length > 0) {
+      return response.data;
+    }
+  } catch (error) {
+    // fallback to mock tickets below
+  }
   await sleep(350); // Simulate API latency
   return [...MOCK_TICKETS];
 }

@@ -255,14 +255,13 @@ def _by_source(results: List[Dict]) -> Dict:
         for src, rs in sources.items()
     }
 
-
 def print_report(metrics: Dict):
     print(f"\n{'='*65}")
     print(f"  EVALUATION REPORT — {metrics['label'].upper()}")
     print(f"  n = {metrics['n']} test cases")
     print(f"{'='*65}")
     rows = [
-        ("Citation Recall@1","grounding ★", metrics["citation_recall_at_1"]),
+        ("Citation Recall@1",                   "grounding*",  metrics["citation_recall_at_1"]),
         ("ROUGE-L","",metrics["rouge_l"]),
         ("BERTScore F1","",metrics["bertscore_f1"]),
         ("Answer Coverage Score (ROUGE-1 R)",   "",            metrics["answer_coverage_score"]),
