@@ -1,17 +1,17 @@
 {
-  "label": "system",
+  "label": "full_system",
   "n": 205,
-  "citation_recall_at_1": 0.1195,
-  "answer_coverage_score": 0.0773,
-  "grounded_escalation_accuracy": 0.9171,
+  "citation_recall_at_1": 0.0,
+  "answer_coverage_score": 0.0008,
+  "grounded_escalation_accuracy": 0.922,
   "outage_aware_response_rate": 1.0,
-  "avg_latency_ms": 36903.41,
-  "p95_latency_ms": 11984.06,
+  "avg_latency_ms": 915.4,
+  "p95_latency_ms": 1502.66,
   "by_domain": {
     "dmv": {
       "n": 200,
-      "citation_recall": 0.1225,
-      "answer_coverage": 0.0789
+      "citation_recall": 0.0,
+      "answer_coverage": 0.0005
     },
     "telecom": {
       "n": 5,
@@ -27,7 +27,7 @@
       "n": 5
     }
   },
-  "rouge_l": 0.09,
-  "bertscore_f1": 0.8107,
-  "hallucination_rate": 0.7366
+  "rouge_l": 0.0477,
+  "bertscore_f1": 0.8013,
+  "hallucination_rate": 1.0
 }
